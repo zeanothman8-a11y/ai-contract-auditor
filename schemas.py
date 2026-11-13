@@ -23,4 +23,5 @@ class ContractAuditReport(BaseModel):
     detected_risks: List[RiskClause] = Field(description="List of all detected risks, penalties, and compliance gaps")
     missing_protections: List[str] = Field(description="Standard protective clauses missing from this document")
     rfp_compliance_matrix: Optional[List[RFPRow]] = Field(default=None, description="Only fill if the document is an RFP: compliance matrix rows")
+    negotiation_email_draft: Optional[str] = Field(default=None, description="A formal, diplomatic, and professional email draft addressed to the opposing party/client summarizing the required contractual revisions and alternative wordings.")
     
