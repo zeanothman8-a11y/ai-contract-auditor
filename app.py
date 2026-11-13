@@ -5,11 +5,26 @@ from auditor import audit_contract
 st.set_page_config(page_title="Verilogix AI - Contract & RFP Auditor", page_icon="⚖️", layout="wide")
 
 st.title("⚖️ AI Contract & RFP Compliance Auditor")
-st.markdown("Automated legal & compliance risk extraction engine with **page-level citations**.")
+st.markdown("Automated legal & compliance risk extraction engine with **page-level citations & alternative negotiation clauses**.")
 
 with st.sidebar:
     st.header("⚙️ Configuration")
     api_key = st.text_input("Enter Gemini API Key", type="password", help="Get a free API key from Google AI Studio")
+    
+    st.markdown("---")
+    jurisdiction = st.selectbox(
+        "Governing Law / Jurisdiction",
+        [
+            "General International Commercial Law",
+            "Saudi Arabian Law (KSA)",
+            "UAE Law",
+            "Egyptian Law",
+            "Syrian Commercial Law",
+            "Common Law / UK / US"
+        ],
+        help="Select the legal framework governing the contract to tailor risk analysis."
+    )
+    
     st.markdown("---")
     custom_rules = st.text_area(
         "Custom Compliance Rules (Optional)",
@@ -23,10 +38,11 @@ if uploaded_file and st.button("🚀 Run Compliance Audit", type="primary"):
     if not api_key:
         st.error("Please enter your API key in the sidebar first.")
     else:
-        with st.spinner("Analyzing pages, checking compliance rules, and validating clauses..."):
+        with st.spinner("Analyzing pages, checking compliance rules, and drafting alternative clauses..."):
             try:
                 pdf_bytes = uploaded_file.read()
-                report = audit_contract(pdf_bytes, api_key, custom_rules)
+                # تمرير نطاق الاختصاص القانوني للدالة
+                report = audit_contract(pdf_bytes, api_key, custom_rules, jurisdiction)
                 
                 # Top Metrics
                 col1, col2, col3 = st.columns(3)
@@ -47,7 +63,8 @@ if uploaded_file and st.button("🚀 Run Compliance Audit", type="primary"):
                             "Clause": r.clause_title,
                             "Exact Quote": r.exact_quote,
                             "Analysis": r.explanation,
-                            "Recommended Action": r.recommended_action
+                            "Recommended Action": r.recommended_action,
+                            "Alternative Wording": r.alternative_wording # عرض البديل المقترح
                         })
                     df = pd.DataFrame(risks_data)
                     st.dataframe(df, use_container_width=True)
@@ -69,4 +86,4 @@ if uploaded_file and st.button("🚀 Run Compliance Audit", type="primary"):
                         
             except Exception as e:
                 st.error(f"Audit failed: {str(e)}")
-              
+                    
