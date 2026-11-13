@@ -61,7 +61,7 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                     user_prompt += f"\n\nAdditional Company Compliance Rules to enforce:\n{custom_rules}"
                 
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.5-flash-lite",
                     contents=user_prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -105,7 +105,7 @@ def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str,
         contents.append(types.Part.from_bytes(data=revised_bytes, mime_type="application/pdf"))
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash-lite",
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
