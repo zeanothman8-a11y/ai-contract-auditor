@@ -2,7 +2,7 @@ import time
 import fitz  # PyMuPDF
 from google import genai
 from google.genai import types
-from schemas import ContractAuditReport
+from schemas import ContractAuditReport, ContractComparisonReport
 
 def extract_text_with_pages(pdf_bytes: bytes) -> str:
     """Extracts text from PDF bytes while tagging each page number accurately."""
@@ -81,4 +81,38 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                 continue
             else:
                 raise e
+def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str, jurisdiction: str = "General International Commercial Law") -> ContractComparisonReport:
+    """Compares Original vs Revised contract versions to verify negotiated edits and catch new hidden risks."""
+    client = genai.Client(api_key=api_key)
+    
+    orig_text = extract_text_with_pages(original_bytes)
+    rev_text = extract_text_with_pages(revised_bytes)
+    
+    system_instruction = (
+        f"You are an elite Senior Corporate Lawyer under {jurisdiction}. "
+        "Compare the ORIGINAL contract against the REVISED contract carefully. "
+        "Identify every material modification, check if previous risk imbalances were fixed, "
+        "and aggressively catch any NEW hidden financial or legal traps slipped into the revised draft."
+    )
+    
+    contents = []
+    # دعم الملفات النصية والممسوحة ضوئياً في المقارنة أيضاً
+    if orig_text.strip() and rev_text.strip():
+        contents.append(f"=== ORIGINAL CONTRACT ===\n{orig_text}\n\n=== REVISED CONTRACT ===\n{rev_text}")
+    else:
+        contents.append("Compare the first document (ORIGINAL) with the second document (REVISED):")
+        contents.append(types.Part.from_bytes(data=original_bytes, mime_type="application/pdf"))
+        contents.append(types.Part.from_bytes(data=revised_bytes, mime_type="application/pdf"))
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            response_mime_type="application/json",
+            response_schema=ContractComparisonReport,
+            temperature=0.1,
+        ),
+    )
+    return ContractComparisonReport.model_validate_json(response.text)
                 
