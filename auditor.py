@@ -1,3 +1,4 @@
+import time
 import fitz  # PyMuPDF
 from google import genai
 from google.genai import types
@@ -16,7 +17,7 @@ def extract_text_with_pages(pdf_bytes: bytes) -> str:
     return "\n\n".join(full_text)
 
 def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", jurisdiction: str = "General International Commercial Law") -> ContractAuditReport:
-    """Audits extracted contract text using Gemini with strict Pydantic structured output and jurisdiction rules."""
+    """Audits extracted contract text using Gemini with strict Pydantic structured output and auto-retry for 503 errors."""
     contract_text = extract_text_with_pages(pdf_bytes)
     
     if not contract_text:
@@ -24,7 +25,6 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
 
     client = genai.Client(api_key=api_key)
     
-    # توجيهات محسنة تأخذ بعين الاعتبار القانون الحاكم وتطلب صياغة بديلة
     system_instruction = (
         f"You are an elite Senior Corporate Lawyer and RFP Compliance Auditor operating under the jurisdiction of: {jurisdiction}. "
         "Analyze the provided contract or RFP document carefully. Identify hidden financial traps, "
@@ -37,16 +37,30 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
     if custom_rules.strip():
         user_prompt += f"\n\nAdditional Company Compliance Rules to enforce:\n{custom_rules}"
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash-lite",
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            response_mime_type="application/json",
-            response_schema=ContractAuditReport,
-            temperature=0.1,
-        ),
-    )
+    max_retries = 3
+    delay = 2  # ثواني الانتظار بين المحاولات
     
-    return ContractAuditReport.model_validate_json(response.text)
-    
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.5-flash-lite",
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=ContractAuditReport,
+                    temperature=0.1,
+                ),
+            )
+            return ContractAuditReport.model_validate_json(response.text)
+            
+        except Exception as e:
+            error_str = str(e)
+            # إذا كان الخطأ بسبب الضغط 503 ولم نصل للمحاولة الأخيرة، انتظر وأعد المحاولة
+            if ("503" in error_str or "UNAVAILABLE" in error_str) and attempt < max_retries - 1:
+                time.sleep(delay)
+                delay *= 2  # مضاعفة وقت الانتظار تصاعدياً
+                continue
+            else:
+                raise e
+                
