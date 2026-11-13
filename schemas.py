@@ -24,4 +24,16 @@ class ContractAuditReport(BaseModel):
     missing_protections: List[str] = Field(description="Standard protective clauses missing from this document")
     rfp_compliance_matrix: Optional[List[RFPRow]] = Field(default=None, description="Only fill if the document is an RFP: compliance matrix rows")
     negotiation_email_draft: Optional[str] = Field(default=None, description="A formal, diplomatic, and professional email draft addressed to the opposing party/client summarizing the required contractual revisions and alternative wordings.")
+class VersionChangeItem(BaseModel):
+    clause_topic: str = Field(description="Topic or section of the modified clause")
+    change_status: Literal["Improved / Accepted", "Partially Addressed", "Ignored / Unchanged", "New Hidden Risk Added"] = Field(description="Evaluation of the change between versions")
+    original_text_summary: str = Field(description="Summary of what the original contract stated")
+    revised_text_summary: str = Field(description="Summary of what the revised contract now states")
+    risk_impact: str = Field(description="Impact of this change on the company's legal/financial safety")
+
+class ContractComparisonReport(BaseModel):
+    overall_improvement_score: int = Field(ge=1, le=100, description="Score from 1 (worse/no progress) to 100 (all risks resolved)")
+    executive_comparison_summary: str = Field(description="Executive summary of how much safer the revised version is compared to the original")
+    changes_breakdown: List[VersionChangeItem] = Field(description="Detailed comparison of key changes and remaining traps")
+    final_recommendation: Literal["Safe to Sign", "Requires Further Negotiation", "Do Not Sign - Critical Traps Remain"] = Field(description="Final legal recommendation")
     
