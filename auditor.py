@@ -15,8 +15,8 @@ def extract_text_with_pages(pdf_bytes: bytes) -> str:
     doc.close()
     return "\n\n".join(full_text)
 
-def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "") -> ContractAuditReport:
-    """Audits extracted contract text using Gemini with strict Pydantic structured output."""
+def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", jurisdiction: str = "General International Commercial Law") -> ContractAuditReport:
+    """Audits extracted contract text using Gemini with strict Pydantic structured output and jurisdiction rules."""
     contract_text = extract_text_with_pages(pdf_bytes)
     
     if not contract_text:
@@ -24,11 +24,13 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "") -> Co
 
     client = genai.Client(api_key=api_key)
     
+    # توجيهات محسنة تأخذ بعين الاعتبار القانون الحاكم وتطلب صياغة بديلة
     system_instruction = (
-        "You are an elite Senior Corporate Lawyer and RFP Compliance Auditor. "
+        f"You are an elite Senior Corporate Lawyer and RFP Compliance Auditor operating under the jurisdiction of: {jurisdiction}. "
         "Analyze the provided contract or RFP document carefully. Identify hidden financial traps, "
         "unfair penalty clauses, liability imbalances, auto-renewal traps, and compliance gaps. "
-        "You MUST cite the exact [PAGE X] number where each issue is located and provide an exact quote."
+        "You MUST cite the exact [PAGE X] number where each issue is located, provide an exact quote, "
+        "and crucially, provide a professional, ready-to-use alternative safe clause text (alternative_wording) that the user can directly negotiate with."
     )
     
     user_prompt = f"Audit the following document:\n\n{contract_text}"
@@ -47,4 +49,4 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "") -> Co
     )
     
     return ContractAuditReport.model_validate_json(response.text)
-  
+    
