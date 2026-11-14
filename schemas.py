@@ -16,11 +16,11 @@ class RFPRow(BaseModel):
     client_requirement: str = Field(description="Summary of what the client is asking for")
     compliance_status: Literal["Compliant", "Non-Compliant", "Partially Compliant"] = Field(description="Company's compliance status")
     bidder_response: str = Field(description="Professional proposed response or mitigation strategy for this requirement")
-
 class ContractAuditReport(BaseModel):
     document_type: Literal["Contract", "RFP (Request for Proposal)"] = Field(description="Identified document type")
     contract_summary: str = Field(description="Executive 3-sentence summary of the document")
     overall_risk_score: int = Field(ge=1, le=100, description="Overall risk score from 1 (safe) to 100 (critical)")
+    estimated_financial_exposure: Optional[str] = Field(description="Estimated total potential financial exposure or loss if all major risks materialize (e.g., '$50,000 or 20% of contract value')")
     detected_risks: List[RiskClause] = Field(description="List of all detected risks, penalties, and compliance gaps")
     missing_protections: List[str] = Field(description="Standard protective clauses missing from this document")
     rfp_compliance_matrix: Optional[List[RFPRow]] = Field(default=None, description="Only fill if the document is an RFP: compliance matrix rows")
