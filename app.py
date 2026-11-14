@@ -193,42 +193,109 @@ with tab1:
 # التبويب الثاني: مقارنة النسخ (Original vs Revised)
 # ==========================================
 with tab2:
-    st.subheader("🔄 Compare Original Draft vs. Revised Draft")
-    st.markdown("ارفع النسخة الأولى من العقد والنسخة المعدلة بعد التفاوض للتحقق من التزام الطرف الآخر بالتعديلات واكتشاف أي بنود مخفية جديدة.")
-    
-    c_col1, c_col2 = st.columns(2)
-    with c_col1:
-        orig_file = st.file_uploader("1️⃣ Original Contract (PDF)", type=["pdf"], key="orig_pdf")
-    with c_col2:
-        rev_file = st.file_uploader("2️⃣ Revised Contract (PDF)", type=["pdf"], key="rev_pdf")
-        
-    if orig_file and rev_file and st.button("⚖️ Compare Versions", type="primary"):
-        if not api_key:
-            st.error("Please enter your API key in the sidebar first.")
-        else:
-            with st.spinner("جاري مقارنة النسختين وتحليل الفروقات القانونية والمالية..."):
-                try:
-                    comp_report = compare_contracts(orig_file.read(), rev_file.read(), api_key, jurisdiction)
-                    st.session_state.comparison_report = comp_report
-                except Exception as e:
-                    st.error(f"Comparison failed: {str(e)}")
+    st.subheader("🔄 Version Comparison & Multi-Round Negotiation Timeline")
+    compare_mode = st.radio(
+        "Select Comparison Mode:",
+        ["Quick 2-Version Compare (Original vs. Revised)", "Multi-Round Negotiation Timeline (V1 → V2 → V3...)"],
+        horizontal=True
+    )
 
-    if st.session_state.comparison_report:
-        comp = st.session_state.comparison_report
-        st.markdown("---")
-        m1, m2 = st.columns(2)
-        m1.metric("Safety Improvement Score", f"{comp.overall_improvement_score} / 100")
-        m2.metric("Final Legal Verdict", comp.final_recommendation)
+    if compare_mode == "Quick 2-Version Compare (Original vs. Revised)":
+        st.markdown("ارفع النسخة الأولى من العقد والنسخة المعدلة بعد التفاوض للتحقق من التزام الطرف الآخر بالتعديلات واكتشاف أي بنود مخفية جديدة.")
         
-        st.info(comp.executive_comparison_summary)
-        
-        st.subheader("📝 Detailed Redline Changes Breakdown")
-        changes_data = [{
-            "Clause Topic": ch.clause_topic,
-            "Status": ch.change_status,
-            "Original Version": ch.original_text_summary,
-            "Revised Version": ch.revised_text_summary,
-            "Risk Impact": ch.risk_impact
-        } for ch in comp.changes_breakdown]
-        st.dataframe(pd.DataFrame(changes_data), use_container_width=True)
-        
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            orig_file = st.file_uploader("1️⃣ Original Contract (PDF)", type=["pdf"], key="orig_pdf")
+        with c_col2:
+            rev_file = st.file_uploader("2️⃣ Revised Contract (PDF)", type=["pdf"], key="rev_pdf")
+            
+        if orig_file and rev_file and st.button("⚖️ Compare Versions", type="primary"):
+            if not api_key:
+                st.error("Please enter your API key in the sidebar first.")
+            else:
+                with st.spinner("جاري مقارنة النسختين وتحليل الفروقات القانونية والمالية..."):
+                    try:
+                        comp_report = compare_contracts(orig_file.read(), rev_file.read(), api_key, jurisdiction)
+                        st.session_state.comparison_report = comp_report
+                    except Exception as e:
+                        st.error(f"Comparison failed: {str(e)}")
+
+        if st.session_state.comparison_report:
+            comp = st.session_state.comparison_report
+            st.markdown("---")
+            m1, m2 = st.columns(2)
+            m1.metric("Safety Improvement Score", f"{comp.overall_improvement_score} / 100")
+            m2.metric("Final Legal Verdict", comp.final_recommendation)
+            
+            st.info(comp.executive_comparison_summary)
+            
+            st.subheader("📝 Detailed Redline Changes Breakdown")
+            changes_data = [{
+                "Clause Topic": ch.clause_topic,
+                "Status": ch.change_status,
+                "Original Version": ch.original_text_summary,
+                "Revised Version": ch.revised_text_summary,
+                "Risk Impact": ch.risk_impact
+            } for ch in comp.changes_breakdown]
+            st.dataframe(pd.DataFrame(changes_data), use_container_width=True)
+
+    else:
+        st.markdown("ارفع نسخ العقد بالترتيب الزمني للجولات التفاوضية (من الأقدم إلى الأحدث) لتتبع تطور المخاطر والبنود العالقة.")
+        timeline_files = st.file_uploader(
+            "Upload Contract Versions in Chronological Order (V1, V2, V3...)",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="timeline_pdfs"
+        )
+
+        if timeline_files:
+            st.caption("الترتيب الحالي للجولات:")
+            for i, f in enumerate(timeline_files, start=1):
+                st.write(f"**Round {i}:** `{f.name}`")
+
+        if timeline_files and len(timeline_files) >= 2 and st.button("📈 Build Negotiation Timeline", type="primary"):
+            if not api_key:
+                st.error("Please enter your API key in the sidebar first.")
+            else:
+                with st.spinner("جاري تحليل مسار التفاوض عبر جميع النسخ..."):
+                    try:
+                        versions_payload = [(f.name, f.read()) for f in timeline_files]
+                        st.session_state.timeline_report = analyze_negotiation_timeline(
+                            versions_payload, api_key, jurisdiction
+                        )
+                    except Exception as e:
+                        st.error(f"Timeline analysis failed: {str(e)}")
+        elif timeline_files and len(timeline_files) < 2:
+            st.warning("يرجى رفع نسختين على الأقل لبناء سجل تفاوض متعدد الجولات.")
+
+        if st.session_state.timeline_report:
+            tl = st.session_state.timeline_report
+            st.markdown("---")
+            st.info(tl.timeline_summary)
+            st.success(f"**Current Legal Verdict:** {tl.overall_negotiation_verdict}")
+
+            score_df = pd.DataFrame([{
+                "Round": f"Round {r.round_number}",
+                "Version": r.version_label,
+                "Risk Score (/100)": r.round_risk_score
+            } for r in tl.rounds])
+            st.subheader("📉 Risk Progression Across Rounds")
+            st.dataframe(score_df, use_container_width=True)
+
+            for r in tl.rounds:
+                with st.expander(f"Round {r.round_number}: {r.version_label} — Risk Score: {r.round_risk_score}/100", expanded=(r.round_number == len(tl.rounds))):
+                    st.write(f"**Key Changes:** {r.key_changes_summary}")
+                    if r.resolved_issues:
+                        st.markdown("**Resolved / Improved:**")
+                        for item in r.resolved_issues:
+                            st.markdown(f"- ✅ {item}")
+                    if r.unresolved_or_new_risks:
+                        st.markdown("**Unresolved or New Risks:**")
+                        for item in r.unresolved_or_new_risks:
+                            st.markdown(f"- ⚠️ {item}")
+
+            if tl.next_round_leverage_tips:
+                st.subheader("🎯 Leverage Tips for Next Negotiation Round")
+                for tip in tl.next_round_leverage_tips:
+                    st.warning(f"• {tip}")
+                        
