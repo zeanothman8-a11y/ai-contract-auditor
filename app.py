@@ -96,12 +96,12 @@ with tab1:
     if st.session_state.audit_reports:
         for file_name, report in st.session_state.audit_reports.items():
             st.markdown(f"--- \n### 📄 تقرير فحص المستند: `{file_name}`")
-            
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Overall Risk Score", f"{report.overall_risk_score} / 100")
             col2.metric("Detected Risks", len(report.detected_risks))
             col3.metric("Document Type", report.document_type)
-            
+            col4.metric("Est. Financial Exposure", getattr(report, "estimated_financial_exposure", "N/A"))
+    
             st.subheader("📋 Executive Summary")
             st.info(report.contract_summary)
             
