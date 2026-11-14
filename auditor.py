@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 from google import genai
 from google.genai import types
 from schemas import ContractAuditReport, ContractComparisonReport
+from security import mask_sensitive_data, unmask_report_text
 
 def extract_text_with_pages(pdf_bytes: bytes) -> str:
     """Extracts text from PDF bytes while tagging each page number accurately."""
@@ -16,30 +17,34 @@ def extract_text_with_pages(pdf_bytes: bytes) -> str:
     doc.close()
     return "\n\n".join(full_text)
 
-def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", jurisdiction: str = "General International Commercial Law") -> ContractAuditReport:
-    """Audits extracted contract or scanned PDF using Gemini with strict Pydantic structured output and auto-retry."""
+def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", jurisdiction: str = "General International Commercial Law", company_playbook: str = "", enable_pii_masking: bool = True) -> ContractAuditReport:
+    """Audits extracted contract or scanned PDF using Gemini with strict Pydantic structured output, PII masking, and Playbook enforcement."""
     client = genai.Client(api_key=api_key)
     
-    # محاولة استخراج النصوص بالطريقة التقليدية أولاً
     contract_text = extract_text_with_pages(pdf_bytes)
+    
+    # تطبيق إخفاء البيانات الحساسة إذا كان الخيار مفعلاً
+    pii_mapping = {}
+    if enable_pii_masking and contract_text.strip():
+        contract_text, pii_mapping = mask_sensitive_data(contract_text)
     
     system_instruction = (
         f"You are an elite Senior Corporate Lawyer and RFP Compliance Auditor operating under the jurisdiction of: {jurisdiction}. "
         "Analyze the provided contract or RFP document carefully. Identify hidden financial traps, "
         "unfair penalty clauses, liability imbalances, auto-renewal traps, and compliance gaps. "
         "You MUST cite the exact [PAGE X] number where each issue is located, provide an exact quote, "
-        "and crucially, provide a professional, ready-to-use alternative safe clause text (alternative_wording) that the user can directly negotiate with."
+        "estimate financial exposure if applicable, check against the provided Company Playbook, "
+        "and crucially, provide a professional, ready-to-use alternative safe clause text (alternative_wording)."
     )
     
     max_retries = 3
-    delay = 2  # ثواني الانتظار بين المحاولات
+    delay = 2
     
     for attempt in range(max_retries):
         try:
-            # إذا كان الملف فارغاً نصياً (مسح ضوئي Scanned)، نرسل ملف الـ PDF كبيانات مباشرة للنموذج المتعدد الوسائط
             if not contract_text.strip():
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash", # استخدام نموذج يدعم الوسائط بكفاءة عالية
+                    model="gemini-2.5-flash",
                     contents=[
                         types.Part.from_bytes(
                             data=pdf_bytes,
@@ -55,10 +60,11 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                     ),
                 )
             else:
-                # إذا وجد نص، نرسل النص الممنهج مع الصفحات
                 user_prompt = f"Audit the following document:\n\n{contract_text}"
+                if company_playbook.strip():
+                    user_prompt += f"\n\nCompany Internal Legal Playbook (Strict Rules to enforce):\n{company_playbook}"
                 if custom_rules.strip():
-                    user_prompt += f"\n\nAdditional Company Compliance Rules to enforce:\n{custom_rules}"
+                    user_prompt += f"\n\nAdditional Custom Compliance Rules:\n{custom_rules}"
                 
                 response = client.models.generate_content(
                     model="gemini-3.5-flash-lite",
@@ -71,7 +77,19 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                     ),
                 )
                 
-            return ContractAuditReport.model_validate_json(response.text)
+            report = ContractAuditReport.model_validate_json(response.text)
+            
+            # إعادة البيانات الحساسة الأصلية لتقرير النتائج إن وجدت
+            if pii_mapping:
+                report.contract_summary = unmask_report_text(report.contract_summary, pii_mapping)
+                if report.negotiation_email_draft:
+                    report.negotiation_email_draft = unmask_report_text(report.negotiation_email_draft, pii_mapping)
+                for risk in report.detected_risks:
+                    risk.exact_quote = unmask_report_text(risk.exact_quote, pii_mapping)
+                    risk.explanation = unmask_report_text(risk.explanation, pii_mapping)
+                    risk.alternative_wording = unmask_report_text(risk.alternative_wording, pii_mapping)
+                    
+            return report
             
         except Exception as e:
             error_str = str(e)
@@ -81,8 +99,8 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                 continue
             else:
                 raise e
+
 def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str, jurisdiction: str = "General International Commercial Law") -> ContractComparisonReport:
-    """Compares Original vs Revised contract versions to verify negotiated edits and catch new hidden risks."""
     client = genai.Client(api_key=api_key)
     
     orig_text = extract_text_with_pages(original_bytes)
@@ -96,7 +114,6 @@ def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str,
     )
     
     contents = []
-    # دعم الملفات النصية والممسوحة ضوئياً في المقارنة أيضاً
     if orig_text.strip() and rev_text.strip():
         contents.append(f"=== ORIGINAL CONTRACT ===\n{orig_text}\n\n=== REVISED CONTRACT ===\n{rev_text}")
     else:
