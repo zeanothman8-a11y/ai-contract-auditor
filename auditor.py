@@ -2,7 +2,7 @@ import time
 import fitz  # PyMuPDF
 from google import genai
 from google.genai import types
-from schemas import ContractAuditReport, ContractComparisonReport
+from schemas import ContractAuditReport, ContractComparisonReport, MultiRoundTimelineReport
 from security import mask_sensitive_data, unmask_report_text
 
 def extract_text_with_pages(pdf_bytes: bytes) -> str:
