@@ -24,6 +24,22 @@ with st.sidebar:
         ]
     )
     
+    st.divider()
+    st.subheader("🛡️ Enterprise Security & Playbook")
+    enable_pii_masking = st.checkbox("Enable PII Anonymization", value=True, help="Masks sensitive names and emails locally before analysis")
+    
+    company_playbook = st.text_area(
+        "Company Legal Playbook Rules",
+        placeholder="e.g., Liability capped at contract value. Payment terms must be >= 45 days. No unilateral termination without 60 days notice.",
+        height=120
+    )
+    
+    custom_rules = st.text_area(
+        "Custom Compliance Rules (Optional)",
+        placeholder="e.g., Special project constraints.",
+        height=100
+    )
+    
     custom_rules = st.text_area(
         "Custom Compliance Rules (Optional)",
         placeholder="e.g., Payment terms must not exceed 30 days.",
@@ -52,7 +68,7 @@ with tab1:
                 with st.spinner(f"جاري تحليل المستند وتوليد مصفوفة الامتثال لـ {uploaded_file.name}..."):
                     try:
                         pdf_bytes = uploaded_file.read()
-                        report = audit_contract(pdf_bytes, api_key, custom_rules, jurisdiction)
+                        report = audit_contract(pdf_bytes, api_key, custom_rules, jurisdiction, company_playbook, enable_pii_masking)
                         st.session_state.audit_reports[uploaded_file.name] = report
                     except Exception as e:
                         st.error(f"Audit failed for {uploaded_file.name}: {str(e)}")
