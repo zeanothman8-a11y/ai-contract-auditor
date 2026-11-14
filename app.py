@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from auditor import audit_contract, compare_contracts
+from auditor import audit_contract, compare_contracts, analyze_negotiation_timeline
 from utils import generate_word_report, generate_excel_report
 
 st.set_page_config(page_title="Verilogix AI - Contract & RFP Auditor", page_icon="⚖️", layout="wide")
@@ -50,6 +50,8 @@ if "audit_reports" not in st.session_state:
     st.session_state.audit_reports = {}
 if "comparison_report" not in st.session_state:
     st.session_state.comparison_report = None
+if "timeline_report" not in st.session_state:
+    st.session_state.timeline_report = None
 
 # تقسيم التطبيق إلى تبويبين رئيسيين
 tab1, tab2 = st.tabs(["🔍 Single & Batch Contract Audit", "⚖️ Version Comparison (Redlining)"])
