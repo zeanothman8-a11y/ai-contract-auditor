@@ -37,4 +37,17 @@ class ContractComparisonReport(BaseModel):
     executive_comparison_summary: str = Field(description="Executive summary of how much safer the revised version is compared to the original")
     changes_breakdown: List[VersionChangeItem] = Field(description="Detailed comparison of key changes and remaining traps")
     final_recommendation: Literal["Safe to Sign", "Requires Further Negotiation", "Do Not Sign - Critical Traps Remain"] = Field(description="Final legal recommendation")
+class NegotiationRound(BaseModel):
+    round_number: int = Field(description="Sequential round number starting from 1")
+    version_label: str = Field(description="Version name or label for this round")
+    key_changes_summary: str = Field(description="Summary of the main edits made in this version compared to the previous one")
+    resolved_issues: List[str] = Field(description="Risks or negotiation points that were resolved or improved in this version")
+    unresolved_or_new_risks: List[str] = Field(description="Remaining unresolved traps or newly introduced risks in this version")
+    round_risk_score: int = Field(ge=1, le=100, description="Risk score for this version from 1 (safest) to 100 (highest risk)")
+
+class MultiRoundTimelineReport(BaseModel):
+    timeline_summary: str = Field(description="Overall executive summary of how the negotiation progressed across all versions")
+    rounds: List[NegotiationRound] = Field(description="Chronological breakdown of each version/round")
+    overall_negotiation_verdict: str = Field(description="Current readiness status and final legal stance")
+    next_round_leverage_tips: List[str] = Field(description="Actionable negotiation points and leverage tips for the next round")
     
