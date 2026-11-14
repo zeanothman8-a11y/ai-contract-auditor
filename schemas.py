@@ -7,9 +7,10 @@ class RiskClause(BaseModel):
     risk_level: Literal["High", "Medium", "Low"] = Field(description="Severity level of the risk")
     exact_quote: str = Field(description="Direct short quote from the contract text")
     explanation: str = Field(description="Clear explanation of why this poses a financial or legal risk")
+    financial_exposure_estimate: Optional[str] = Field(description="Estimated financial impact or liability cap risk in currency equivalent if applicable")
+    playbook_violation: Optional[str] = Field(description="How this violates the company's custom internal playbook rules, if specified")
     recommended_action: str = Field(description="Suggested negotiation edit or mitigation step")
     alternative_wording: str = Field(description="Ready-to-use alternative safe clause text in professional legal phrasing")
-
 class RFPRow(BaseModel):
     requirement_number: str = Field(description="Section or clause number from the RFP")
     client_requirement: str = Field(description="Summary of what the client is asking for")
