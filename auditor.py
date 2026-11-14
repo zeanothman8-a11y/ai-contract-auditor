@@ -132,4 +132,25 @@ def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str,
         ),
     )
     return ContractComparisonReport.model_validate_json(response.text)
+def ask_contract_question(pdf_bytes: bytes, api_key: str, question: str, jurisdiction: str = "General International Commercial Law") -> str:
+    """Answers specific user questions based on the uploaded contract text with page citations."""
+    client = genai.Client(api_key=api_key)
+    contract_text = extract_text_with_pages(pdf_bytes)
+    
+    system_instruction = (
+        f"You are an expert Legal Assistant operating under {jurisdiction}. "
+        "Answer the user's specific question about the provided contract accurately and objectively. "
+        "You MUST cite the exact [PAGE X] number and provide short exact quotes supporting your answer."
+    )
+    
+    response = client.models.generate_content(
+        model="gemini-3.5-flash-lite",
+        contents=f"Contract Document Text:\n\n{contract_text}\n\nUser Question: {question}",
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.2,
+        ),
+    )
+    return response.text
+    
                 
