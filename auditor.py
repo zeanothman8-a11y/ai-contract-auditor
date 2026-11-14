@@ -152,5 +152,70 @@ def ask_contract_question(pdf_bytes: bytes, api_key: str, question: str, jurisdi
         ),
     )
     return response.text
-    
+def analyze_negotiation_timeline(
+    versions: list[tuple[str, bytes]],
+    api_key: str,
+    jurisdiction: str = "General International Commercial Law",
+) -> MultiRoundTimelineReport:
+    """Analyzes multiple sequential contract versions (V1 -> V2 -> V3...) to track negotiation progress and hidden risks."""
+    client = genai.Client(api_key=api_key)
+
+    system_instruction = (
+        f"You are an elite Senior Corporate Lawyer and Lead Contract Negotiator under {jurisdiction}. "
+        "You are given multiple contract versions in chronological order (Version 1 is the earliest/initial draft, "
+        "followed by subsequent revisions). Track how each round resolves or ignores prior issues, "
+        "detect any new traps introduced in later rounds, score the risk of each version (1-100), "
+        "and provide sharp negotiation leverage tips for the next round."
+    )
+
+    contents = [
+        f"Analyze these {len(versions)} sequential contract versions in exact chronological order:"
+    ]
+
+    all_have_text = True
+    extracted_versions = []
+    for idx, (fname, pdf_bytes) in enumerate(versions, start=1):
+        text = extract_text_with_pages(pdf_bytes)
+        extracted_versions.append((idx, fname, text, pdf_bytes))
+        if not text.strip():
+            all_have_text = False
+
+    if all_have_text:
+        combined_parts = []
+        for idx, fname, text, _ in extracted_versions:
+            combined_parts.append(f"=== VERSION {idx}: {fname} ===\n{text}")
+        contents.append("\n\n".join(combined_parts))
+    else:
+        for idx, fname, text, pdf_bytes in extracted_versions:
+            contents.append(f"--- VERSION {idx}: {fname} ---")
+            if text.strip():
+                contents.append(text)
+            else:
+                contents.append(types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"))
+
+    max_retries = 3
+    delay = 2
+
+    for attempt in range(max_retries):
+        try:
+            model_name = "gemini-3.5-flash-lite" if all_have_text else "gemini-2.5-flash"
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=MultiRoundTimelineReport,
+                    temperature=0.1,
+                ),
+            )
+            return MultiRoundTimelineReport.model_validate_json(response.text)
+        except Exception as e:
+            error_str = str(e)
+            if ("503" in error_str or "UNAVAILABLE" in error_str) and attempt < max_retries - 1:
+                time.sleep(delay)
+                delay *= 2
+                continue
+            raise e
+        
                 
