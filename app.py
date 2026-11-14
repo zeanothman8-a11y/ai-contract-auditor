@@ -67,7 +67,11 @@ with tab1:
             for uploaded_file in uploaded_files:
                 with st.spinner(f"جاري تحليل المستند وتوليد مصفوفة الامتثال لـ {uploaded_file.name}..."):
                     try:
+                        if "pdf_bytes_store" not in st.session_state:
+                            st.session_state.pdf_bytes_store = {}
+                        # داخل حلقة رفع الملفات:
                         pdf_bytes = uploaded_file.read()
+                        st.session_state.pdf_bytes_store[uploaded_file.name] = pdf_bytes
                         report = audit_contract(pdf_bytes, api_key, custom_rules, jurisdiction, company_playbook, enable_pii_masking)
                         st.session_state.audit_reports[uploaded_file.name] = report
                     except Exception as e:
@@ -157,6 +161,31 @@ with tab1:
             if report.negotiation_email_draft:
                 st.subheader("✉️ Negotiation Email Draft (مسودة إيميل التفاوض)")
                 st.code(report.negotiation_email_draft, language="markdown")
+                        # --- ميزة مساعد المحادثة الذكي لكل عقد ---
+            st.markdown("---")
+            st.subheader(f"💬 Chat with `{file_name}` (المساعد القانوني التفاعلي)")
+            st.markdown("اطرح أي سؤال محدد حول هذا العقد وسيقوم الذكاء الاصطناعي بالإجابة مع استخراج أرقام الصفحات:")
+            
+            user_question = st.text_input(
+                "Example: What are the conditions for contract termination?", 
+                key=f"q_input_{file_name}",
+                placeholder="اكتب سؤالك هنا..."
+            )
+            
+            if user_question:
+                if not api_key:
+                    st.error("Please enter your API key first.")
+                else:
+                    with st.spinner("جاري البحث في بنود العقد وتحليل الإجابة..."):
+                        try:
+                            from auditor import ask_contract_question
+                            file_bytes = st.session_state.pdf_bytes_store.get(file_name)
+                            answer = ask_contract_question(file_bytes, api_key, user_question, jurisdiction)
+                            st.success("الإجابة القانونية:")
+                            st.markdown(answer)
+                        except Exception as e:
+                            st.error(f"Failed to answer question: {str(e)}")
+                            
 
 # ==========================================
 # التبويب الثاني: مقارنة النسخ (Original vs Revised)
