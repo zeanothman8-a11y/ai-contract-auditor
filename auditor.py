@@ -5,6 +5,8 @@ from google.genai import types
 from schemas import ContractAuditReport, ContractComparisonReport, MultiRoundTimelineReport
 from security import mask_sensitive_data, unmask_report_text
 
+ENGLISH_ONLY_RULE = " Always write every output field, explanation, summary, draft, and answer strictly in English regardless of the input document or question language."
+
 def extract_text_with_pages(pdf_bytes: bytes) -> str:
     """Extracts text from PDF bytes while tagging each page number accurately."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -23,7 +25,7 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
     
     contract_text = extract_text_with_pages(pdf_bytes)
     
-    # تطبيق إخفاء البيانات الحساسة إذا كان الخيار مفعلاً
+    # Apply PII masking if enabled
     pii_mapping = {}
     if enable_pii_masking and contract_text.strip():
         contract_text, pii_mapping = mask_sensitive_data(contract_text)
@@ -35,6 +37,7 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
         "You MUST cite the exact [PAGE X] number where each issue is located, provide an exact quote, "
         "estimate financial exposure if applicable, check against the provided Company Playbook, "
         "and crucially, provide a professional, ready-to-use alternative safe clause text (alternative_wording)."
+        + ENGLISH_ONLY_RULE
     )
     
     max_retries = 3
@@ -79,7 +82,7 @@ def audit_contract(pdf_bytes: bytes, api_key: str, custom_rules: str = "", juris
                 
             report = ContractAuditReport.model_validate_json(response.text)
             
-            # إعادة البيانات الحساسة الأصلية لتقرير النتائج إن وجدت
+            # Restore original sensitive data in the report if masked
             if pii_mapping:
                 report.contract_summary = unmask_report_text(report.contract_summary, pii_mapping)
                 if report.negotiation_email_draft:
@@ -111,6 +114,7 @@ def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str,
         "Compare the ORIGINAL contract against the REVISED contract carefully. "
         "Identify every material modification, check if previous risk imbalances were fixed, "
         "and aggressively catch any NEW hidden financial or legal traps slipped into the revised draft."
+        + ENGLISH_ONLY_RULE
     )
     
     contents = []
@@ -132,6 +136,7 @@ def compare_contracts(original_bytes: bytes, revised_bytes: bytes, api_key: str,
         ),
     )
     return ContractComparisonReport.model_validate_json(response.text)
+
 def ask_contract_question(pdf_bytes: bytes, api_key: str, question: str, jurisdiction: str = "General International Commercial Law") -> str:
     """Answers specific user questions based on the uploaded contract text with page citations."""
     client = genai.Client(api_key=api_key)
@@ -141,6 +146,7 @@ def ask_contract_question(pdf_bytes: bytes, api_key: str, question: str, jurisdi
         f"You are an expert Legal Assistant operating under {jurisdiction}. "
         "Answer the user's specific question about the provided contract accurately and objectively. "
         "You MUST cite the exact [PAGE X] number and provide short exact quotes supporting your answer."
+        + ENGLISH_ONLY_RULE
     )
     
     response = client.models.generate_content(
@@ -152,6 +158,7 @@ def ask_contract_question(pdf_bytes: bytes, api_key: str, question: str, jurisdi
         ),
     )
     return response.text
+
 def analyze_negotiation_timeline(
     versions: list[tuple[str, bytes]],
     api_key: str,
@@ -166,6 +173,7 @@ def analyze_negotiation_timeline(
         "followed by subsequent revisions). Track how each round resolves or ignores prior issues, "
         "detect any new traps introduced in later rounds, score the risk of each version (1-100), "
         "and provide sharp negotiation leverage tips for the next round."
+        + ENGLISH_ONLY_RULE
     )
 
     contents = [
@@ -217,5 +225,4 @@ def analyze_negotiation_timeline(
                 delay *= 2
                 continue
             raise e
-        
                 
