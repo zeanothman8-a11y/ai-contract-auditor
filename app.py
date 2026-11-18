@@ -33,17 +33,10 @@ with st.sidebar:
         placeholder="e.g., Liability capped at contract value. Payment terms must be >= 45 days. No unilateral termination without 60 days notice.",
         height=120
     )
-    
     custom_rules = st.text_area(
         "Custom Compliance Rules (Optional)",
-        placeholder="e.g., Special project constraints.",
-        height=100
-    )
-    
-    custom_rules = st.text_area(
-        "Custom Compliance Rules (Optional)",
-        placeholder="e.g., Payment terms must not exceed 30 days.",
-        height=150
+        placeholder="e.g., Payment terms must not exceed 30 days or special project constraints.",
+        height=140
     )
 
 if "audit_reports" not in st.session_state:
@@ -53,11 +46,11 @@ if "comparison_report" not in st.session_state:
 if "timeline_report" not in st.session_state:
     st.session_state.timeline_report = None
 
-# تقسيم التطبيق إلى تبويبين رئيسيين
+# Split the application into two main tabs
 tab1, tab2 = st.tabs(["🔍 Single & Batch Contract Audit", "⚖️ Version Comparison (Redlining)"])
 
 # ==========================================
-# التبويب الأول: التدقيق الفردي والجماعي + لوحة المخاطر
+# Tab 1: Single & Batch Audit + Risk Dashboard
 # ==========================================
 with tab1:
     uploaded_files = st.file_uploader("Upload Contract or RFP Documents (PDF)", type=["pdf"], accept_multiple_files=True)
@@ -67,11 +60,11 @@ with tab1:
             st.error("Please enter your API key in the sidebar first.")
         else:
             for uploaded_file in uploaded_files:
-                with st.spinner(f"جاري تحليل المستند وتوليد مصفوفة الامتثال لـ {uploaded_file.name}..."):
+                with st.spinner(f"Analyzing document and generating compliance matrix for {uploaded_file.name}..."):
                     try:
                         if "pdf_bytes_store" not in st.session_state:
                             st.session_state.pdf_bytes_store = {}
-                        # داخل حلقة رفع الملفات:
+                        # Inside the file upload loop:
                         pdf_bytes = uploaded_file.read()
                         st.session_state.pdf_bytes_store[uploaded_file.name] = pdf_bytes
                         report = audit_contract(pdf_bytes, api_key, custom_rules, jurisdiction, company_playbook, enable_pii_masking)
@@ -79,9 +72,9 @@ with tab1:
                     except Exception as e:
                         st.error(f"Audit failed for {uploaded_file.name}: {str(e)}")
 
-    # لوحة تحكم سريعة عند وجود أكثر من مستند (Portfolio Overview)
+    # Quick dashboard when more than one document is uploaded (Portfolio Overview)
     if len(st.session_state.audit_reports) > 1:
-        st.subheader("📊 Portfolio Risk Overview (ملخص العقود المرفوعة)")
+        st.subheader("📊 Portfolio Risk Overview")
         summary_rows = []
         for fname, rep in st.session_state.audit_reports.items():
             summary_rows.append({
@@ -94,10 +87,10 @@ with tab1:
         summary_df = pd.DataFrame(summary_rows).sort_values(by="Risk Score (/100)", ascending=False)
         st.dataframe(summary_df, use_container_width=True)
 
-    # عرض تفاصيل كل تقرير
+    # Display details for each report
     if st.session_state.audit_reports:
         for file_name, report in st.session_state.audit_reports.items():
-            st.markdown(f"--- \n### 📄 تقرير فحص المستند: `{file_name}`")
+            st.markdown(f"--- \n### 📄 Document Audit Report: `{file_name}`")
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Overall Risk Score", f"{report.overall_risk_score} / 100")
             col2.metric("Detected Risks", len(report.detected_risks))
@@ -107,7 +100,7 @@ with tab1:
             st.subheader("📋 Executive Summary")
             st.info(report.contract_summary)
             
-            # أزرار تحميل التقارير (Word و Excel)
+            # Report download buttons (Word and Excel)
             dl_col1, dl_col2 = st.columns(2)
             with dl_col1:
                 docx_buffer = generate_word_report(report, file_name)
@@ -146,7 +139,7 @@ with tab1:
                 st.success("No major risk clauses detected!")
 
             if report.rfp_compliance_matrix:
-                st.subheader("📊 RFP Compliance Matrix (جدول مطابقة الشروط)")
+                st.subheader("📊 RFP Compliance Matrix")
                 matrix_data = [{
                     "Req #": m.requirement_number,
                     "Client Requirement": m.client_requirement,
@@ -161,36 +154,37 @@ with tab1:
                     st.warning(f"• {item}")
 
             if report.negotiation_email_draft:
-                st.subheader("✉️ Negotiation Email Draft (مسودة إيميل التفاوض)")
+                st.subheader("✉️ Negotiation Email Draft")
                 st.code(report.negotiation_email_draft, language="markdown")
-                        # --- ميزة مساعد المحادثة الذكي لكل عقد ---
+
+            # --- Interactive Chat Assistant per Contract ---
             st.markdown("---")
-            st.subheader(f"💬 Chat with `{file_name}` (المساعد القانوني التفاعلي)")
-            st.markdown("اطرح أي سؤال محدد حول هذا العقد وسيقوم الذكاء الاصطناعي بالإجابة مع استخراج أرقام الصفحات:")
+            st.subheader(f"💬 Chat with `{file_name}` (Interactive Legal Assistant)")
+            st.markdown("Ask any specific question about this contract and AI will answer with extracted page numbers:")
             
             user_question = st.text_input(
                 "Example: What are the conditions for contract termination?", 
                 key=f"q_input_{file_name}",
-                placeholder="اكتب سؤالك هنا..."
+                placeholder="Type your question here..."
             )
             
             if user_question:
                 if not api_key:
                     st.error("Please enter your API key first.")
                 else:
-                    with st.spinner("جاري البحث في بنود العقد وتحليل الإجابة..."):
+                    with st.spinner("Searching contract clauses and analyzing the answer..."):
                         try:
                             from auditor import ask_contract_question
                             file_bytes = st.session_state.pdf_bytes_store.get(file_name)
                             answer = ask_contract_question(file_bytes, api_key, user_question, jurisdiction)
-                            st.success("الإجابة القانونية:")
+                            st.success("Legal Answer:")
                             st.markdown(answer)
                         except Exception as e:
                             st.error(f"Failed to answer question: {str(e)}")
-                            
+
 
 # ==========================================
-# التبويب الثاني: مقارنة النسخ (Original vs Revised)
+# Tab 2: Version Comparison (Original vs Revised)
 # ==========================================
 with tab2:
     st.subheader("🔄 Version Comparison & Multi-Round Negotiation Timeline")
@@ -201,7 +195,7 @@ with tab2:
     )
 
     if compare_mode == "Quick 2-Version Compare (Original vs. Revised)":
-        st.markdown("ارفع النسخة الأولى من العقد والنسخة المعدلة بعد التفاوض للتحقق من التزام الطرف الآخر بالتعديلات واكتشاف أي بنود مخفية جديدة.")
+        st.markdown("Upload the original contract version and the revised version after negotiation to verify adherence to edits and detect any hidden new clauses.")
         
         c_col1, c_col2 = st.columns(2)
         with c_col1:
@@ -213,7 +207,7 @@ with tab2:
             if not api_key:
                 st.error("Please enter your API key in the sidebar first.")
             else:
-                with st.spinner("جاري مقارنة النسختين وتحليل الفروقات القانونية والمالية..."):
+                with st.spinner("Comparing both versions and analyzing legal and financial differences..."):
                     try:
                         comp_report = compare_contracts(orig_file.read(), rev_file.read(), api_key, jurisdiction)
                         st.session_state.comparison_report = comp_report
@@ -240,7 +234,7 @@ with tab2:
             st.dataframe(pd.DataFrame(changes_data), use_container_width=True)
 
     else:
-        st.markdown("ارفع نسخ العقد بالترتيب الزمني للجولات التفاوضية (من الأقدم إلى الأحدث) لتتبع تطور المخاطر والبنود العالقة.")
+        st.markdown("Upload contract versions in chronological order of negotiation rounds (from oldest to newest) to track risk progression and open clauses.")
         timeline_files = st.file_uploader(
             "Upload Contract Versions in Chronological Order (V1, V2, V3...)",
             type=["pdf"],
@@ -249,7 +243,7 @@ with tab2:
         )
 
         if timeline_files:
-            st.caption("الترتيب الحالي للجولات:")
+            st.caption("Current round order:")
             for i, f in enumerate(timeline_files, start=1):
                 st.write(f"**Round {i}:** `{f.name}`")
 
@@ -257,7 +251,7 @@ with tab2:
             if not api_key:
                 st.error("Please enter your API key in the sidebar first.")
             else:
-                with st.spinner("جاري تحليل مسار التفاوض عبر جميع النسخ..."):
+                with st.spinner("Analyzing negotiation path across all versions..."):
                     try:
                         versions_payload = [(f.name, f.read()) for f in timeline_files]
                         st.session_state.timeline_report = analyze_negotiation_timeline(
@@ -266,7 +260,7 @@ with tab2:
                     except Exception as e:
                         st.error(f"Timeline analysis failed: {str(e)}")
         elif timeline_files and len(timeline_files) < 2:
-            st.warning("يرجى رفع نسختين على الأقل لبناء سجل تفاوض متعدد الجولات.")
+            st.warning("Please upload at least two versions to build a multi-round negotiation timeline.")
 
         if st.session_state.timeline_report:
             tl = st.session_state.timeline_report
@@ -298,4 +292,3 @@ with tab2:
                 st.subheader("🎯 Leverage Tips for Next Negotiation Round")
                 for tip in tl.next_round_leverage_tips:
                     st.warning(f"• {tip}")
-                        
