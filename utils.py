@@ -54,7 +54,7 @@ def generate_excel_report(report):
     """Generates a styled multi-tab Excel workbook for RFP matrix and Detected Risks."""
     wb = Workbook()
     
-    # تنسيقات موحدة احترافية
+    # Shared styling definitions
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=11)
     thin_border = Border(
@@ -65,7 +65,7 @@ def generate_excel_report(report):
     )
     wrap_alignment = Alignment(wrap_text=True, vertical="top")
 
-    # 1. ورقة المخاطر المكتشفة (Detected Risks)
+    # 1. Detected Risks sheet
     ws_risks = wb.active
     ws_risks.title = "Detected Risks"
     
@@ -89,7 +89,7 @@ def generate_excel_report(report):
         ]
         ws_risks.append(row_data)
         
-        # تلوين مستوى الخطورة
+        # Highlight risk level cell
         curr_row = ws_risks.max_row
         risk_cell = ws_risks.cell(row=curr_row, column=1)
         if r.risk_level == "High":
@@ -107,12 +107,12 @@ def generate_excel_report(report):
             c.border = thin_border
             c.alignment = wrap_alignment
 
-    # ضبط عرض الأعمدة
+    # Adjust column widths
     risk_widths = [14, 8, 25, 35, 40, 35, 45]
     for idx, width in enumerate(risk_widths, 1):
         ws_risks.column_dimensions[chr(64 + idx)].width = width
 
-    # 2. ورقة مصفوفة مطابقة الشروط (RFP Compliance Matrix) إن وجدت
+    # 2. RFP Compliance Matrix sheet (if present)
     if report.rfp_compliance_matrix:
         ws_rfp = wb.create_sheet(title="RFP Compliance Matrix")
         rfp_headers = ["Req #", "Client Requirement", "Compliance Status", "Proposed Bidder Response"]
