@@ -1,3 +1,4 @@
+import difflib
 import time
 from typing import Any, TypeVar
 import fitz  # PyMuPDF
@@ -32,19 +33,64 @@ def _language_rule(output_language: OutputLanguage = "English") -> str:
     )
 
 
-def extract_text_with_pages(pdf_bytes: bytes) -> str:
-    """Extracts text from PDF bytes while tagging each page number accurately."""
+def extract_document_data(pdf_bytes: bytes) -> dict[str, Any]:
+    """Extracts text with page markers alongside metadata (page_count, is_scanned)."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     full_text: list[str] = []
+    page_count = len(doc)
     try:
-        for page_num in range(len(doc)):
+        for page_num in range(page_count):
             page = doc[page_num]
             text = page.get_text("text").strip()
             if text:
                 full_text.append(f"--- [PAGE {page_num + 1}] ---\n{text}")
     finally:
         doc.close()
-    return "\n\n".join(full_text)
+    joined_text = "\n\n".join(full_text)
+    return {
+        "extracted_text": joined_text,
+        "page_count": page_count,
+        "is_scanned": not bool(joined_text.strip()),
+    }
+
+
+def extract_text_with_pages(pdf_bytes: bytes) -> str:
+    """Backward-compatible helper returning only extracted page-tagged text."""
+    return extract_document_data(pdf_bytes)["extracted_text"]
+
+
+def compute_quick_redline_diff(orig_text: str, rev_text: str, max_chars: int = 12000) -> dict[str, Any]:
+    """Computes local line-level unified diff and similarity stats using Python difflib."""
+    orig_lines = [line.strip() for line in orig_text.splitlines() if line.strip()]
+    rev_lines = [line.strip() for line in rev_text.splitlines() if line.strip()]
+
+    matcher = difflib.SequenceMatcher(None, orig_lines, rev_lines)
+    similarity_pct = round(matcher.ratio() * 100, 1)
+
+    diff_lines = list(
+        difflib.unified_diff(
+            orig_lines,
+            rev_lines,
+            fromfile="Original_Version",
+            tofile="Revised_Version",
+            lineterm="",
+            n=1,
+        )
+    )
+
+    added_count = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+    removed_count = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+    diff_text = "\n".join(diff_lines)
+    if len(diff_text) > max_chars:
+        diff_text = diff_text[:max_chars] + "\n... [Diff truncated for token efficiency]"
+
+    return {
+        "similarity_pct": similarity_pct,
+        "added_lines": added_count,
+        "removed_lines": removed_count,
+        "unified_diff": diff_text,
+        "has_changes": bool(added_count or removed_count),
+    }
 
 
 def _generate_with_retry(
@@ -92,12 +138,13 @@ def audit_contract(
     custom_rules: str = "",
     jurisdiction: str = "General International Commercial Law",
     company_playbook: str = "",
+    deal_breakers: str = "",
     enable_pii_masking: bool = True,
     output_language: OutputLanguage = "English",
     custom_pii_terms: list[str] | None = None,
     pre_extracted_text: str | None = None,
 ) -> ContractAuditReport:
-    """Audits extracted contract text or scanned PDF using Gemini with structured output and PII handling."""
+    """Audits extracted contract text or scanned PDF with Deal-Breakers, Playbook, and PII masking."""
     client = genai.Client(api_key=api_key)
 
     contract_text = (
@@ -113,30 +160,39 @@ def audit_contract(
         "Analyze the provided contract or RFP document carefully. Identify hidden financial traps, "
         "unfair penalty clauses, liability imbalances, auto-renewal traps, and compliance gaps. "
         "You MUST cite the exact [PAGE X] number where each issue is located, provide an exact quote, "
-        "estimate financial exposure if applicable, check against the provided Company Playbook, "
-        "and provide a professional, ready-to-use alternative safe clause text (alternative_wording)."
+        "estimate financial exposure if applicable, check against the provided Company Playbook and Non-Negotiable Deal-Breakers, "
+        "and provide a professional, ready-to-use alternative safe clause text (alternative_wording). "
+        "CRITICAL DEAL-BREAKER RULE: If any clause violates the user's Non-Negotiable Deal-Breakers, set "
+        "is_deal_breaker=True, force risk_level='High', clearly state which deal-breaker was violated in "
+        "deal_breaker_reason, and elevate overall_risk_score to at least 90."
         + _language_rule(output_language)
     )
 
+    extra_constraints = ""
+    if deal_breakers.strip():
+        extra_constraints += (
+            f"\n\nNON-NEGOTIABLE DEAL-BREAKERS (Absolute Red Lines — flag any violation immediately):\n{deal_breakers}"
+        )
+    if company_playbook.strip():
+        extra_constraints += f"\n\nCompany Internal Legal Playbook (Strict Rules to enforce):\n{company_playbook}"
+    if custom_rules.strip():
+        extra_constraints += f"\n\nAdditional Custom Compliance Rules:\n{custom_rules}"
+
     if not contract_text.strip():
+        prompt_text = "Audit this scanned or image-based document thoroughly following the instructions." + extra_constraints
         response = _generate_with_retry(
             client=client,
             model="gemini-3.5-flash",
             contents=[
                 types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
-                "Audit this scanned or image-based document thoroughly following the instructions.",
+                prompt_text,
             ],
             system_instruction=system_instruction,
             temperature=0.1,
             response_schema=ContractAuditReport,
         )
     else:
-        user_prompt = f"Audit the following document:\n\n{contract_text}"
-        if company_playbook.strip():
-            user_prompt += f"\n\nCompany Internal Legal Playbook (Strict Rules to enforce):\n{company_playbook}"
-        if custom_rules.strip():
-            user_prompt += f"\n\nAdditional Custom Compliance Rules:\n{custom_rules}"
-
+        user_prompt = f"Audit the following document:\n\n{contract_text}{extra_constraints}"
         response = _generate_with_retry(
             client=client,
             model="gemini-3.5-flash-lite",
@@ -147,6 +203,15 @@ def audit_contract(
         )
 
     report = ContractAuditReport.model_validate_json(response.text)
+
+    # Enforce Deal-Breaker score escalation deterministically in Python as well
+    triggered_count = sum(1 for r in report.detected_risks if r.is_deal_breaker)
+    report.deal_breakers_triggered = triggered_count
+    if triggered_count > 0:
+        for r in report.detected_risks:
+            if r.is_deal_breaker:
+                r.risk_level = "High"
+        report.overall_risk_score = max(report.overall_risk_score, min(100, 88 + triggered_count * 4))
 
     if pii_mapping:
         report.contract_summary = unmask_report_text(report.contract_summary, pii_mapping)
@@ -167,6 +232,8 @@ def audit_contract(
             risk.explanation = unmask_report_text(risk.explanation, pii_mapping)
             risk.recommended_action = unmask_report_text(risk.recommended_action, pii_mapping)
             risk.alternative_wording = unmask_report_text(risk.alternative_wording, pii_mapping)
+            if risk.deal_breaker_reason:
+                risk.deal_breaker_reason = unmask_report_text(risk.deal_breaker_reason, pii_mapping)
             if risk.financial_exposure_estimate:
                 risk.financial_exposure_estimate = unmask_report_text(
                     risk.financial_exposure_estimate, pii_mapping
@@ -185,6 +252,7 @@ def compare_contracts(
     output_language: OutputLanguage = "English",
     pre_orig_text: str | None = None,
     pre_rev_text: str | None = None,
+    use_quick_diff: bool = True,
 ) -> ContractComparisonReport:
     client = genai.Client(api_key=api_key)
 
@@ -200,9 +268,18 @@ def compare_contracts(
     )
 
     if orig_text.strip() and rev_text.strip():
-        contents: Any = (
-            f"=== ORIGINAL CONTRACT ===\n{orig_text}\n\n=== REVISED CONTRACT ===\n{rev_text}"
-        )
+        if use_quick_diff:
+            diff_info = compute_quick_redline_diff(orig_text, rev_text)
+            contents: Any = (
+                f"=== LOCAL DIFF PRE-SCAN (Similarity: {diff_info['similarity_pct']}%, "
+                f"+{diff_info['added_lines']} / -{diff_info['removed_lines']} lines) ===\n"
+                f"{diff_info['unified_diff']}\n\n"
+                f"=== FULL REVISED CONTRACT CONTEXT ===\n{rev_text}"
+            )
+        else:
+            contents = (
+                f"=== ORIGINAL CONTRACT ===\n{orig_text}\n\n=== REVISED CONTRACT ===\n{rev_text}"
+            )
         model_name = "gemini-3.5-flash-lite"
     else:
         contents = [
@@ -301,7 +378,7 @@ def analyze_negotiation_timeline(
             else:
                 contents.append(types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"))
 
-    model_name = "gemini-3.5-flash-lite" if all_have_text else "gemini-3.5-flash"
+    model_name = "gemini-3.5-flash-lite" if all_have_text else "gemini-2.5-flash"
     response = _generate_with_retry(
         client=client,
         model=model_name,
@@ -311,4 +388,4 @@ def analyze_negotiation_timeline(
         response_schema=MultiRoundTimelineReport,
     )
     return MultiRoundTimelineReport.model_validate_json(response.text)
-            
+    
