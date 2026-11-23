@@ -1,95 +1,206 @@
+from datetime import date
 import io
 from docx import Document
+from docx.shared import Pt, RGBColor
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
-def generate_word_report(report, filename):
+
+def generate_word_report(report, filename: str = "contract") -> io.BytesIO:
     doc = Document()
-    doc.add_heading("⚖️ Legal & Compliance Audit Report", 0)
-    
+    doc.add_heading(f"Legal & Compliance Audit Report — {filename}", 0)
+
     doc.add_heading("Executive Summary", level=1)
-    doc.add_paragraph(report.contract_summary)
-    
+    doc.add_paragraph(report.contract_summary or "")
+
     doc.add_heading(f"Overall Risk Score: {report.overall_risk_score} / 100", level=1)
-    
+    if getattr(report, "deal_breakers_triggered", 0) > 0:
+        p_db = doc.add_paragraph()
+        run_db = p_db.add_run(
+            f"CRITICAL ALERT: {report.deal_breakers_triggered} Non-Negotiable Deal-Breaker(s) Violated!"
+        )
+        run_db.bold = True
+        run_db.font.color.rgb = RGBColor(180, 0, 0)
+
+    if getattr(report, "estimated_financial_exposure", None):
+        doc.add_paragraph(f"Estimated Total Financial Exposure: {report.estimated_financial_exposure}")
+
     doc.add_heading("Detected Risks & Alternative Wording", level=1)
     for idx, r in enumerate(report.detected_risks, 1):
-        doc.add_heading(f"{idx}. {r.clause_title} (Risk: {r.risk_level} - Page {r.page_number})", level=2)
+        db_tag = " [DEAL-BREAKER]" if getattr(r, "is_deal_breaker", False) else ""
+        doc.add_heading(
+            f"{idx}. {r.clause_title}{db_tag} (Risk: {r.risk_level} - Page {r.page_number})",
+            level=2,
+        )
+        if getattr(r, "deal_breaker_reason", None):
+            p_reason = doc.add_paragraph()
+            run_r = p_reason.add_run(f"Deal-Breaker Violation: {r.deal_breaker_reason}")
+            run_r.bold = True
+            run_r.font.color.rgb = RGBColor(180, 0, 0)
         doc.add_paragraph(f"Exact Quote: {r.exact_quote}")
         doc.add_paragraph(f"Explanation: {r.explanation}")
+        if getattr(r, "financial_exposure_estimate", None):
+            doc.add_paragraph(f"Financial Exposure Estimate: {r.financial_exposure_estimate}")
+        if getattr(r, "playbook_violation", None):
+            doc.add_paragraph(f"Playbook Violation: {r.playbook_violation}")
         doc.add_paragraph(f"Recommended Action: {r.recommended_action}")
         p = doc.add_paragraph()
         p.add_run("Alternative Wording to Propose: ").bold = True
-        p.add_run(r.alternative_wording)
+        p.add_run(r.alternative_wording or "")
         doc.add_paragraph("-" * 40)
-        
+
     if report.missing_protections:
         doc.add_heading("Missing Protective Clauses", level=1)
         for item in report.missing_protections:
-            doc.add_paragraph(f"• {item}", style='List Bullet')
-            
+            doc.add_paragraph(str(item), style="List Bullet")
+
     if report.rfp_compliance_matrix:
         doc.add_heading("RFP Compliance Matrix", level=1)
         table = doc.add_table(rows=1, cols=4)
         hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = 'Req #'
-        hdr_cells[1].text = 'Client Requirement'
-        hdr_cells[2].text = 'Status'
-        hdr_cells[3].text = 'Bidder Response / Solution'
-        
+        hdr_cells[0].text = "Req #"
+        hdr_cells[1].text = "Client Requirement"
+        hdr_cells[2].text = "Status"
+        hdr_cells[3].text = "Bidder Response / Solution"
+
         for row in report.rfp_compliance_matrix:
             row_cells = table.add_row().cells
             row_cells[0].text = str(row.requirement_number)
             row_cells[1].text = str(row.client_requirement)
             row_cells[2].text = str(row.compliance_status)
             row_cells[3].text = str(row.bidder_response)
-            
+
+    if getattr(report, "negotiation_email_draft", None):
+        doc.add_heading("Negotiation Email Draft", level=1)
+        doc.add_paragraph(str(report.negotiation_email_draft))
+
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
 
-def generate_excel_report(report):
-    """Generates a styled multi-tab Excel workbook for RFP matrix and Detected Risks."""
+def generate_counter_proposal_docx(report, filename: str = "contract") -> io.BytesIO:
+    """Generates a formal, client-ready Counter-Proposal & Redline Schedule DOCX document."""
+    doc = Document()
+
+    title = doc.add_heading("FORMAL CONTRACTUAL REVIEW & REDLINE COUNTER-PROPOSAL", 0)
+    title.runs[0].font.size = Pt(16)
+
+    meta_p = doc.add_paragraph()
+    meta_p.add_run("Date: ").bold = True
+    meta_p.add_run(f"{date.today().isoformat()}\n")
+    meta_p.add_run("Reference Document: ").bold = True
+    meta_p.add_run(f"{filename}\n")
+    meta_p.add_run("Subject: ").bold = True
+    meta_p.add_run("Proposed Contractual Revisions & Safe Clause Amendments")
+
+    doc.add_heading("1. Cover Letter / Formal Transmittal", level=1)
+    cover_text = (
+        getattr(report, "negotiation_email_draft", None)
+        or "Dear Counterparty Legal & Commercial Team,\n\n"
+        "Thank you for sharing the draft agreement. Following our internal legal and commercial review, "
+        "we are pleased to proceed subject to the targeted clause amendments detailed in the schedule below."
+    )
+    doc.add_paragraph(str(cover_text))
+
+    doc.add_heading("2. Schedule of Proposed Redline Amendments", level=1)
+    if report.detected_risks:
+        table = doc.add_table(rows=1, cols=5)
+        table.style = "Table Grid"
+        headers = [
+            "Clause & Page",
+            "Priority",
+            "Current Draft Excerpt",
+            "Rationale / Objection",
+            "Proposed Alternative Wording",
+        ]
+        for idx, text in enumerate(headers):
+            cell = table.rows[0].cells[idx]
+            cell.text = text
+            for p in cell.paragraphs:
+                for run in p.runs:
+                    run.bold = True
+
+        for r in report.detected_risks:
+            row_cells = table.add_row().cells
+            priority_label = (
+                "MANDATORY (Deal-Breaker)" if getattr(r, "is_deal_breaker", False) else r.risk_level
+            )
+            row_cells[0].text = f"{r.clause_title}\n(Page {r.page_number})"
+            row_cells[1].text = priority_label
+            row_cells[2].text = str(r.exact_quote or "-")
+            row_cells[3].text = str(getattr(r, "deal_breaker_reason", None) or r.explanation or "-")
+            row_cells[4].text = str(r.alternative_wording or "-")
+    else:
+        doc.add_paragraph("No textual amendments required.")
+
+    if report.missing_protections:
+        doc.add_heading("3. Requested Additional Protective Clauses", level=1)
+        for item in report.missing_protections:
+            doc.add_paragraph(str(item), style="List Bullet")
+
+    doc.add_paragraph("\nSincerely,\nLegal & Commercial Review Team")
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_excel_report(report) -> io.BytesIO:
+    """Generates a styled multi-tab Excel workbook for Detected Risks and RFP Matrix."""
     wb = Workbook()
-    
-    # Shared styling definitions
+
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=11)
     thin_border = Border(
-        left=Side(style='thin', color='D9D9D9'),
-        right=Side(style='thin', color='D9D9D9'),
-        top=Side(style='thin', color='D9D9D9'),
-        bottom=Side(style='thin', color='D9D9D9')
+        left=Side(style="thin", color="D9D9D9"),
+        right=Side(style="thin", color="D9D9D9"),
+        top=Side(style="thin", color="D9D9D9"),
+        bottom=Side(style="thin", color="D9D9D9"),
     )
     wrap_alignment = Alignment(wrap_text=True, vertical="top")
 
-    # 1. Detected Risks sheet
     ws_risks = wb.active
     ws_risks.title = "Detected Risks"
-    
-    risk_headers = ["Risk Level", "Page", "Clause Title", "Exact Quote", "Analysis", "Recommended Action", "Alternative Wording"]
+
+    risk_headers = [
+        "Risk Level",
+        "Deal-Breaker",
+        "Page",
+        "Clause Title",
+        "Exact Quote",
+        "Analysis",
+        "Financial Exposure",
+        "Playbook Violation",
+        "Recommended Action",
+        "Alternative Wording",
+    ]
     ws_risks.append(risk_headers)
-    
+
     for cell in ws_risks[1]:
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for r in report.detected_risks:
+        is_db = getattr(r, "is_deal_breaker", False)
         row_data = [
             r.risk_level,
+            "YES - RED LINE" if is_db else "No",
             r.page_number,
             r.clause_title,
             r.exact_quote,
             r.explanation,
+            getattr(r, "financial_exposure_estimate", None) or "-",
+            getattr(r, "playbook_violation", None) or "-",
             r.recommended_action,
-            r.alternative_wording
+            r.alternative_wording,
         ]
         ws_risks.append(row_data)
-        
-        # Highlight risk level cell
+
         curr_row = ws_risks.max_row
         risk_cell = ws_risks.cell(row=curr_row, column=1)
         if r.risk_level == "High":
@@ -102,57 +213,73 @@ def generate_excel_report(report):
             risk_cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
             risk_cell.font = Font(color="006100", bold=True)
 
-        for col_idx in range(1, 8):
+        if is_db:
+            db_cell = ws_risks.cell(row=curr_row, column=2)
+            db_cell.fill = PatternFill(start_color="9C0006", end_color="9C0006", fill_type="solid")
+            db_cell.font = Font(color="FFFFFF", bold=True)
+
+        for col_idx in range(1, len(risk_headers) + 1):
             c = ws_risks.cell(row=curr_row, column=col_idx)
             c.border = thin_border
             c.alignment = wrap_alignment
 
-    # Adjust column widths
-    risk_widths = [14, 8, 25, 35, 40, 35, 45]
+    risk_widths = [14, 16, 8, 25, 35, 38, 22, 25, 35, 45]
     for idx, width in enumerate(risk_widths, 1):
-        ws_risks.column_dimensions[chr(64 + idx)].width = width
+        ws_risks.column_dimensions[get_column_letter(idx)].width = width
 
-    # 2. RFP Compliance Matrix sheet (if present)
     if report.rfp_compliance_matrix:
         ws_rfp = wb.create_sheet(title="RFP Compliance Matrix")
-        rfp_headers = ["Req #", "Client Requirement", "Compliance Status", "Proposed Bidder Response"]
+        rfp_headers = [
+            "Req #",
+            "Client Requirement",
+            "Compliance Status",
+            "Proposed Bidder Response",
+        ]
         ws_rfp.append(rfp_headers)
-        
+
         for cell in ws_rfp[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
-            
+
         for m in report.rfp_compliance_matrix:
-            ws_rfp.append([
-                m.requirement_number,
-                m.client_requirement,
-                m.compliance_status,
-                m.bidder_response
-            ])
+            ws_rfp.append(
+                [
+                    m.requirement_number,
+                    m.client_requirement,
+                    m.compliance_status,
+                    m.bidder_response,
+                ]
+            )
             curr_row = ws_rfp.max_row
             status_cell = ws_rfp.cell(row=curr_row, column=3)
             if m.compliance_status == "Compliant":
-                status_cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+                status_cell.fill = PatternFill(
+                    start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
+                )
                 status_cell.font = Font(color="006100", bold=True)
             elif m.compliance_status == "Non-Compliant":
-                status_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                status_cell.fill = PatternFill(
+                    start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"
+                )
                 status_cell.font = Font(color="9C0006", bold=True)
             else:
-                status_cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+                status_cell.fill = PatternFill(
+                    start_color="FFEB9C", end_color="FFEB9C", fill_type="solid"
+                )
                 status_cell.font = Font(color="9C6500", bold=True)
-                
-            for col_idx in range(1, 5):
+
+            for col_idx in range(1, len(rfp_headers) + 1):
                 c = ws_rfp.cell(row=curr_row, column=col_idx)
                 c.border = thin_border
                 c.alignment = wrap_alignment
 
         rfp_widths = [12, 45, 22, 55]
         for idx, width in enumerate(rfp_widths, 1):
-            ws_rfp.column_dimensions[chr(64 + idx)].width = width
+            ws_rfp.column_dimensions[get_column_letter(idx)].width = width
 
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     return buffer
-    
+        
