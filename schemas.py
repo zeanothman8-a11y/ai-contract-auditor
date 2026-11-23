@@ -8,6 +8,14 @@ class RiskClause(BaseModel):
     clause_title: str = Field(description="Short title of the risky or non-compliant clause")
     page_number: int = Field(description="Exact page number where this clause appears")
     risk_level: Literal["High", "Medium", "Low"] = Field(description="Severity level of the risk")
+    is_deal_breaker: bool = Field(
+        default=False,
+        description="True ONLY if this clause directly violates any of the user's Non-Negotiable Deal-Breakers",
+    )
+    deal_breaker_reason: Optional[str] = Field(
+        default=None,
+        description="Specific explanation of which Deal-Breaker rule was violated, if is_deal_breaker is True",
+    )
     exact_quote: str = Field(description="Direct short quote from the contract text")
     explanation: str = Field(description="Clear explanation of why this poses a financial or legal risk")
     financial_exposure_estimate: Optional[str] = Field(
@@ -41,6 +49,10 @@ class ContractAuditReport(BaseModel):
     )
     contract_summary: str = Field(description="Executive 3-sentence summary of the document")
     overall_risk_score: int = Field(ge=1, le=100, description="Overall risk score from 1 (safe) to 100 (critical)")
+    deal_breakers_triggered: int = Field(
+        default=0,
+        description="Total count of Non-Negotiable Deal-Breakers violated in this document",
+    )
     estimated_financial_exposure: Optional[str] = Field(
         default=None,
         description="Estimated total potential financial exposure or loss if all major risks materialize",
