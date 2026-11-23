@@ -6,9 +6,14 @@ from auditor import (
     ask_contract_question,
     audit_contract,
     compare_contracts,
-    extract_text_with_pages,
+    compute_quick_redline_diff,
+    extract_document_data,
 )
-from utils import generate_excel_report, generate_word_report
+from utils import (
+    generate_counter_proposal_docx,
+    generate_excel_report,
+    generate_word_report,
+)
 
 st.set_page_config(
     page_title="Verilogix AI - Contract & RFP Auditor",
@@ -18,7 +23,7 @@ st.set_page_config(
 
 st.title("⚖️ Verilogix AI — Legal & RFP Compliance Engine")
 st.markdown(
-    "Automated risk extraction, **RFP compliance matrices, negotiation drafting & redline version comparison**."
+    "Automated risk extraction, **Deal-Breaker enforcement, RFP compliance matrices, counter-proposal drafting & redline comparison**."
 )
 
 
@@ -28,6 +33,14 @@ def _cached_word_report(report_json: str, filename: str) -> bytes:
 
     parsed = ContractAuditReport.model_validate_json(report_json)
     return generate_word_report(parsed, filename).getvalue()
+
+
+@st.cache_data(show_spinner=False)
+def _cached_counter_proposal_docx(report_json: str, filename: str) -> bytes:
+    from schemas import ContractAuditReport
+
+    parsed = ContractAuditReport.model_validate_json(report_json)
+    return generate_counter_proposal_docx(parsed, filename).getvalue()
 
 
 @st.cache_data(show_spinner=False)
@@ -64,6 +77,15 @@ with st.sidebar:
     )
 
     st.divider()
+    st.subheader("🚨 Deal-Breakers (Non-Negotiables)")
+    deal_breakers = st.text_area(
+        "Red-Line Rules (Auto-Escalates Risk)",
+        placeholder="e.g., No unlimited liability. No IP ownership transfer. Delay penalties must not exceed 5% of contract value.",
+        height=110,
+        help="Any violation triggers an immediate Deal-Breaker alert and escalates the risk score.",
+    )
+
+    st.divider()
     st.subheader("🛡️ Enterprise Security & Playbook")
     enable_pii_masking = st.checkbox(
         "Enable PII Anonymization",
@@ -78,22 +100,25 @@ with st.sidebar:
     company_playbook = st.text_area(
         "Company Legal Playbook Rules",
         placeholder="e.g., Liability capped at contract value. Payment terms must be >= 45 days. No unilateral termination without 60 days notice.",
-        height=120,
+        height=110,
     )
     custom_rules = st.text_area(
         "Custom Compliance Rules (Optional)",
         placeholder="e.g., Payment terms must not exceed 30 days or special project constraints.",
-        height=140,
+        height=100,
     )
 
 if "audit_reports" not in st.session_state:
     st.session_state.audit_reports = {}
 if "pdf_bytes_store" not in st.session_state:
     st.session_state.pdf_bytes_store = {}
-if "extracted_text_store" not in st.session_state:
-    st.session_state.extracted_text_store = {}
+if "doc_meta_store" not in st.session_state:
+    # Stores {filename: {"extracted_text": str, "page_count": int, "is_scanned": bool}}
+    st.session_state.doc_meta_store = {}
 if "comparison_report" not in st.session_state:
     st.session_state.comparison_report = None
+if "quick_diff_preview" not in st.session_state:
+    st.session_state.quick_diff_preview = None
 if "last_compare_pair" not in st.session_state:
     st.session_state.last_compare_pair = None
 if "timeline_report" not in st.session_state:
@@ -126,12 +151,12 @@ with tab1:
                     try:
                         pdf_bytes = uploaded_file.getvalue()
                         st.session_state.pdf_bytes_store[uploaded_file.name] = pdf_bytes
-                        extracted_txt = extract_text_with_pages(pdf_bytes)
-                        st.session_state.extracted_text_store[uploaded_file.name] = extracted_txt
+                        doc_meta = extract_document_data(pdf_bytes)
+                        st.session_state.doc_meta_store[uploaded_file.name] = doc_meta
 
-                        if enable_pii_masking and not extracted_txt.strip():
+                        if enable_pii_masking and doc_meta["is_scanned"]:
                             st.warning(
-                                f"`{uploaded_file.name}` appears to be a scanned/image PDF with no extractable text layer; it will be sent directly to Gemini Vision without local text redaction."
+                                f"`{uploaded_file.name}` ({doc_meta['page_count']} pages) appears to be a scanned/image PDF with no extractable text layer; it will be sent directly to Gemini Vision without local text redaction."
                             )
 
                         report = audit_contract(
@@ -140,10 +165,11 @@ with tab1:
                             custom_rules=custom_rules,
                             jurisdiction=jurisdiction,
                             company_playbook=company_playbook,
+                            deal_breakers=deal_breakers,
                             enable_pii_masking=enable_pii_masking,
                             output_language=output_language,
                             custom_pii_terms=custom_pii_terms,
-                            pre_extracted_text=extracted_txt,
+                            pre_extracted_text=doc_meta["extracted_text"],
                         )
                         st.session_state.audit_reports[uploaded_file.name] = report
                     except Exception as e:
@@ -158,6 +184,7 @@ with tab1:
                     "Document Name": fname,
                     "Type": rep.document_type,
                     "Risk Score (/100)": rep.overall_risk_score,
+                    "Deal-Breakers": getattr(rep, "deal_breakers_triggered", 0),
                     "Total Risks": len(rep.detected_risks),
                     "High Risks": sum(1 for r in rep.detected_risks if r.risk_level == "High"),
                 }
@@ -169,12 +196,22 @@ with tab1:
 
     if st.session_state.audit_reports:
         for file_name, report in st.session_state.audit_reports.items():
-            st.markdown(f"---\n### 📄 Document Audit Report: `{file_name}`")
-            col1, col2, col3, col4 = st.columns(4)
+            doc_meta = st.session_state.doc_meta_store.get(file_name, {})
+            pages_label = f" ({doc_meta['page_count']} pages)" if doc_meta.get("page_count") else ""
+            st.markdown(f"---\n### 📄 Document Audit Report: `{file_name}`{pages_label}")
+
+            db_count = getattr(report, "deal_breakers_triggered", 0)
+            if db_count > 0:
+                st.error(
+                    f"🛑 **DEAL-BREAKER ALERT:** {db_count} non-negotiable red-line rule(s) violated in this document! Do not sign without removing these clauses."
+                )
+
+            col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Overall Risk Score", f"{report.overall_risk_score} / 100")
-            col2.metric("Detected Risks", len(report.detected_risks))
-            col3.metric("Document Type", report.document_type)
-            col4.metric(
+            col2.metric("Deal-Breakers", db_count)
+            col3.metric("Detected Risks", len(report.detected_risks))
+            col4.metric("Document Type", report.document_type)
+            col5.metric(
                 "Est. Financial Exposure",
                 report.estimated_financial_exposure or "N/A",
             )
@@ -183,11 +220,11 @@ with tab1:
             st.info(report.contract_summary)
 
             report_json = report.model_dump_json()
-            dl_col1, dl_col2 = st.columns(2)
+            dl_col1, dl_col2, dl_col3 = st.columns(3)
             with dl_col1:
                 docx_bytes = _cached_word_report(report_json, file_name)
                 st.download_button(
-                    label="📥 Download Word Report (.docx)",
+                    label="📥 Full Audit Report (.docx)",
                     data=docx_bytes,
                     file_name=f"audit_report_{file_name}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -195,9 +232,19 @@ with tab1:
                     width="stretch",
                 )
             with dl_col2:
+                counter_bytes = _cached_counter_proposal_docx(report_json, file_name)
+                st.download_button(
+                    label="✉️ Formal Counter-Proposal (.docx)",
+                    data=counter_bytes,
+                    file_name=f"counter_proposal_{file_name}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"counter_{file_name}",
+                    width="stretch",
+                )
+            with dl_col3:
                 excel_bytes = _cached_excel_report(report_json)
                 st.download_button(
-                    label="📊 Download Excel Matrix (.xlsx)",
+                    label="📊 Excel Risk Matrix (.xlsx)",
                     data=excel_bytes,
                     file_name=f"compliance_matrix_{file_name}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -209,9 +256,11 @@ with tab1:
             if report.detected_risks:
                 risks_data = [
                     {
+                        "Deal-Breaker": "🛑 YES" if getattr(r, "is_deal_breaker", False) else "No",
                         "Risk Level": r.risk_level,
                         "Page": r.page_number,
                         "Clause": r.clause_title,
+                        "Deal-Breaker Reason": getattr(r, "deal_breaker_reason", None) or "-",
                         "Exact Quote": r.exact_quote,
                         "Analysis": r.explanation,
                         "Financial Exposure": r.financial_exposure_estimate or "-",
@@ -266,7 +315,7 @@ with tab1:
                     with st.spinner("Searching contract clauses and analyzing the answer..."):
                         try:
                             file_bytes = st.session_state.pdf_bytes_store.get(file_name)
-                            cached_txt = st.session_state.extracted_text_store.get(file_name)
+                            cached_txt = doc_meta.get("extracted_text")
                             answer = ask_contract_question(
                                 pdf_bytes=file_bytes,
                                 api_key=api_key,
@@ -306,6 +355,11 @@ with tab2:
         with c_col2:
             rev_file = st.file_uploader("2️⃣ Revised Contract (PDF)", type=["pdf"], key="rev_pdf")
 
+        use_quick_diff = st.checkbox(
+            "⚡ Enable Local Quick Redline Diff Pre-Scan (difflib — saves tokens & highlights exact line edits)",
+            value=True,
+        )
+
         current_pair = (
             (orig_file.name, orig_file.size, rev_file.name, rev_file.size)
             if (orig_file and rev_file)
@@ -313,30 +367,62 @@ with tab2:
         )
         if current_pair != st.session_state.last_compare_pair:
             st.session_state.comparison_report = None
+            st.session_state.quick_diff_preview = None
             st.session_state.last_compare_pair = current_pair
 
-        if orig_file and rev_file and st.button("⚖️ Compare Versions", type="primary"):
-            if not api_key:
-                st.error("Please enter your API key in the sidebar first.")
-            else:
-                with st.spinner(
-                    "Comparing both versions and analyzing legal and financial differences..."
-                ):
-                    try:
-                        orig_bytes = orig_file.getvalue()
-                        rev_bytes = rev_file.getvalue()
-                        comp_report = compare_contracts(
-                            original_bytes=orig_bytes,
-                            revised_bytes=rev_bytes,
-                            api_key=api_key,
-                            jurisdiction=jurisdiction,
-                            output_language=output_language,
-                            pre_orig_text=extract_text_with_pages(orig_bytes),
-                            pre_rev_text=extract_text_with_pages(rev_bytes),
+        if orig_file and rev_file:
+            b_col1, b_col2 = st.columns(2)
+            with b_col1:
+                if st.button("⚡ Instant Local Diff Preview (No API Cost)", width="stretch"):
+                    orig_meta = extract_document_data(orig_file.getvalue())
+                    rev_meta = extract_document_data(rev_file.getvalue())
+                    if orig_meta["is_scanned"] or rev_meta["is_scanned"]:
+                        st.warning("One or both PDFs are scanned images; local text diff requires text-based PDFs.")
+                    else:
+                        st.session_state.quick_diff_preview = compute_quick_redline_diff(
+                            orig_meta["extracted_text"], rev_meta["extracted_text"]
                         )
-                        st.session_state.comparison_report = comp_report
-                    except Exception as e:
-                        st.error(f"Comparison failed: {str(e)}")
+            with b_col2:
+                run_ai_compare = st.button("⚖️ Deep AI Legal Comparison", type="primary", width="stretch")
+
+            if st.session_state.quick_diff_preview:
+                qd = st.session_state.quick_diff_preview
+                with st.expander(
+                    f"⚡ Local Text Diff — Similarity: {qd['similarity_pct']}% (+{qd['added_lines']} added / -{qd['removed_lines']} removed lines)",
+                    expanded=True,
+                ):
+                    if qd["has_changes"]:
+                        st.code(qd["unified_diff"], language="diff")
+                    else:
+                        st.success("Both documents have identical extracted text.")
+
+            if run_ai_compare:
+                if not api_key:
+                    st.error("Please enter your API key in the sidebar first.")
+                else:
+                    with st.spinner(
+                        "Comparing both versions and analyzing legal and financial differences..."
+                    ):
+                        try:
+                            orig_meta = extract_document_data(orig_file.getvalue())
+                            rev_meta = extract_document_data(rev_file.getvalue())
+                            if not orig_meta["is_scanned"] and not rev_meta["is_scanned"]:
+                                st.session_state.quick_diff_preview = compute_quick_redline_diff(
+                                    orig_meta["extracted_text"], rev_meta["extracted_text"]
+                                )
+                            comp_report = compare_contracts(
+                                original_bytes=orig_file.getvalue(),
+                                revised_bytes=rev_file.getvalue(),
+                                api_key=api_key,
+                                jurisdiction=jurisdiction,
+                                output_language=output_language,
+                                pre_orig_text=orig_meta["extracted_text"],
+                                pre_rev_text=rev_meta["extracted_text"],
+                                use_quick_diff=use_quick_diff,
+                            )
+                            st.session_state.comparison_report = comp_report
+                        except Exception as e:
+                            st.error(f"Comparison failed: {str(e)}")
 
         if st.session_state.comparison_report:
             comp = st.session_state.comparison_report
