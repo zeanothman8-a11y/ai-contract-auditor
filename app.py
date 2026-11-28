@@ -16,14 +16,92 @@ from utils import (
 )
 
 st.set_page_config(
-    page_title="Verilogix AI - Contract & RFP Auditor",
+    page_title="Verilogix AI — Contract & RFP Intelligence",
     page_icon="⚖️",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
-st.title("⚖️ Verilogix AI — Legal & RFP Compliance Engine")
+# Custom UI Styling for a cleaner, executive SaaS look
 st.markdown(
-    "Automated risk extraction, **Deal-Breaker enforcement, RFP compliance matrices, counter-proposal drafting & redline comparison**."
+    """
+    <style>
+        .block-container {
+            padding-top: 1.6rem;
+            padding-bottom: 2.5rem;
+            max-width: 1280px;
+        }
+        .hero-box {
+            background: linear-gradient(135deg, #111827 0%, #1e293b 60%, #0f172a 100%);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 16px;
+            padding: 1.4rem 1.6rem;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+        }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.14);
+            color: #7dd3fc;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.2rem 0.65rem;
+            border-radius: 999px;
+            margin-bottom: 0.55rem;
+            letter-spacing: 0.02em;
+        }
+        .hero-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #f8fafc;
+            margin: 0 0 0.35rem 0;
+            line-height: 1.25;
+        }
+        .hero-sub {
+            font-size: 0.98rem;
+            color: #cbd5e1;
+            margin: 0;
+            line-height: 1.5;
+        }
+        div[data-testid="stMetric"] {
+            background: rgba(30, 41, 59, 0.55);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+        }
+        div[data-testid="stMetric"] label {
+            color: #94a3b8 !important;
+            font-size: 0.8rem !important;
+        }
+        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+            color: #f8fafc !important;
+            font-weight: 700 !important;
+        }
+        .stButton > button[kind="primary"] {
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 0.55rem 1.1rem;
+        }
+        .stDownloadButton > button {
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        div[data-testid="stDataFrame"] {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+    </style>
+    <div class="hero-box">
+        <div class="hero-badge">VERILOGIX AI • RISK & COMPLIANCE ENGINE</div>
+        <div class="hero-title">⚖️ Contract &amp; RFP Risk Intelligence</div>
+        <p class="hero-sub">
+            Spot high-risk clauses, deal-breakers, and financial exposure in seconds — with redline comparison, negotiation drafts, and instant exportable reports.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -288,13 +366,13 @@ with tab1:
                 st.dataframe(pd.DataFrame(matrix_data), width="stretch")
 
             if report.missing_protections:
-                st.subheader("🛡️ Missing Protective Clauses")
-                for item in report.missing_protections:
-                    st.warning(f"• {item}")
+                with st.expander("🛡️ Missing Protective Clauses", expanded=False):
+                    for item in report.missing_protections:
+                        st.warning(f"• {item}")
 
             if report.negotiation_email_draft:
-                st.subheader("✉️ Negotiation Email Draft")
-                st.code(report.negotiation_email_draft, language="markdown")
+                with st.expander("✉️ Negotiation Email Draft", expanded=False):
+                    st.code(report.negotiation_email_draft, language="markdown")
 
             st.markdown("---")
             st.subheader(f"💬 Chat with `{file_name}` (Interactive Legal Assistant)")
@@ -397,89 +475,6 @@ with tab2:
                         st.success("Both documents have identical extracted text.")
 
             if run_ai_compare:
-                if not api_key:
-                    st.error("Please enter your API key in the sidebar first.")
-                else:
-                    with st.spinner(
-                        "Comparing both versions and analyzing legal and financial differences..."
-                    ):
-                        try:
-                            orig_meta = extract_document_data(orig_file.getvalue())
-                            rev_meta = extract_document_data(rev_file.getvalue())
-                            if not orig_meta["is_scanned"] and not rev_meta["is_scanned"]:
-                                st.session_state.quick_diff_preview = compute_quick_redline_diff(
-                                    orig_meta["extracted_text"], rev_meta["extracted_text"]
-                                )
-                            comp_report = compare_contracts(
-                                original_bytes=orig_file.getvalue(),
-                                revised_bytes=rev_file.getvalue(),
-                                api_key=api_key,
-                                jurisdiction=jurisdiction,
-                                output_language=output_language,
-                                pre_orig_text=orig_meta["extracted_text"],
-                                pre_rev_text=rev_meta["extracted_text"],
-                                use_quick_diff=use_quick_diff,
-                            )
-                            st.session_state.comparison_report = comp_report
-                        except Exception as e:
-                            st.error(f"Comparison failed: {str(e)}")
-
-        if st.session_state.comparison_report:
-            comp = st.session_state.comparison_report
-            st.markdown("---")
-            m1, m2 = st.columns(2)
-            m1.metric("Safety Improvement Score", f"{comp.overall_improvement_score} / 100")
-            m2.metric("Final Legal Verdict", comp.final_recommendation)
-
-            st.info(comp.executive_comparison_summary)
-
-            st.subheader("📝 Detailed Redline Changes Breakdown")
-            changes_data = [
-                {
-                    "Clause Topic": ch.clause_topic,
-                    "Status": ch.change_status,
-                    "Original Version": ch.original_text_summary,
-                    "Revised Version": ch.revised_text_summary,
-                    "Risk Impact": ch.risk_impact,
-                }
-                for ch in comp.changes_breakdown
-            ]
-            st.dataframe(pd.DataFrame(changes_data), width="stretch")
-
-    else:
-        st.markdown(
-            "Upload contract versions in chronological order of negotiation rounds (from oldest to newest) to track risk progression and open clauses."
-        )
-        timeline_files = st.file_uploader(
-            "Upload Contract Versions in Chronological Order (V1, V2, V3...)",
-            type=["pdf"],
-            accept_multiple_files=True,
-            key="timeline_pdfs",
-        )
-
-        if timeline_files:
-            sig = hashlib.md5(
-                "|".join(f"{f.name}:{f.size}" for f in timeline_files).encode()
-            ).hexdigest()
-            if sig != st.session_state.last_timeline_sig:
-                st.session_state.timeline_report = None
-                st.session_state.last_timeline_sig = sig
-
-            file_names = [f.name for f in timeline_files]
-            ordered_names = st.multiselect(
-                "Verify or Adjust Chronological Round Order (First = Round 1):",
-                options=file_names,
-                default=file_names,
-            )
-            file_map = {f.name: f for f in timeline_files}
-            ordered_files = [file_map[n] for n in ordered_names if n in file_map]
-
-            for i, f in enumerate(ordered_files, start=1):
-                st.write(f"**Round {i}:** `{f.name}`")
-
-            if len(ordered_files) >= 2 and st.button(
-                "📈 Build Negotiation Timeline", type="primary"
-            ):
                 if not api_key:
                     st.error("Please enter your API key in the sidebar first.")
                 else:
