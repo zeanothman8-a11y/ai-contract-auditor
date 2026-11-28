@@ -22,83 +22,216 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Custom UI Styling for a cleaner, executive SaaS look
+# Full-page executive SaaS theme & custom typography
 st.markdown(
     """
     <style>
-        .block-container {
-            padding-top: 1.6rem;
-            padding-bottom: 2.5rem;
-            max-width: 1280px;
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        html, body, [class*="css"] {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
+
+        /* Full app background override */
+        [data-testid="stAppViewContainer"] {
+            background: radial-gradient(circle at 15% 10%, #132238 0%, #090e1a 48%, #060911 100%) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-testid="stHeader"] {
+            background: rgba(9, 14, 26, 0.72) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #0d1526 0%, #090e1a 100%) !important;
+            border-right: 1px solid rgba(56, 189, 248, 0.16) !important;
+        }
+
+        .block-container {
+            padding-top: 1.4rem !important;
+            padding-bottom: 3rem !important;
+            max-width: 1280px !important;
+        }
+
+        /* Hero Banner */
         .hero-box {
-            background: linear-gradient(135deg, #111827 0%, #1e293b 60%, #0f172a 100%);
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            border-radius: 16px;
-            padding: 1.4rem 1.6rem;
-            margin-bottom: 1.2rem;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.78) 55%, rgba(14, 116, 144, 0.25) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.28);
+            border-radius: 18px;
+            padding: 1.5rem 1.75rem;
+            margin-bottom: 1.35rem;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .hero-badge {
             display: inline-block;
             background: rgba(56, 189, 248, 0.14);
-            color: #7dd3fc;
-            border: 1px solid rgba(56, 189, 248, 0.35);
-            font-size: 0.78rem;
-            font-weight: 600;
-            padding: 0.2rem 0.65rem;
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.38);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.24rem 0.75rem;
             border-radius: 999px;
-            margin-bottom: 0.55rem;
-            letter-spacing: 0.02em;
+            margin-bottom: 0.65rem;
+            letter-spacing: 0.06em;
         }
         .hero-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #f8fafc;
-            margin: 0 0 0.35rem 0;
+            font-size: 1.85rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #ffffff 0%, #bae6fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 0.4rem 0;
             line-height: 1.25;
+            letter-spacing: -0.02em;
         }
         .hero-sub {
             font-size: 0.98rem;
             color: #cbd5e1;
             margin: 0;
-            line-height: 1.5;
+            line-height: 1.55;
+            max-width: 820px;
         }
-        div[data-testid="stMetric"] {
-            background: rgba(30, 41, 59, 0.55);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+        .hero-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.95rem;
+        }
+        .hero-pill {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            color: #e2e8f0;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.28rem 0.7rem;
+            border-radius: 8px;
+        }
+
+        /* Headings & Text */
+        h1, h2, h3, h4 {
+            color: #f8fafc !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.01em;
+        }
+        p, label, .stMarkdown {
+            color: #e2e8f0;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.5rem;
+            background: rgba(15, 23, 42, 0.65);
+            padding: 0.35rem;
             border-radius: 12px;
-            padding: 0.85rem 1rem;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 9px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+        }
+
+        /* File Uploader */
+        [data-testid="stFileUploader"] section {
+            background: rgba(15, 23, 42, 0.68) !important;
+            border: 1.5px dashed rgba(56, 189, 248, 0.42) !important;
+            border-radius: 14px !important;
+            padding: 1.1rem !important;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        [data-testid="stFileUploader"] section:hover {
+            border-color: #38bdf8 !important;
+            background: rgba(15, 23, 42, 0.88) !important;
+        }
+
+        /* Metric Cards */
+        div[data-testid="stMetric"] {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.68) 0%, rgba(15, 23, 42, 0.85) 100%) !important;
+            border: 1px solid rgba(56, 189, 248, 0.22) !important;
+            border-radius: 14px !important;
+            padding: 0.9rem 1.05rem !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
         }
         div[data-testid="stMetric"] label {
             color: #94a3b8 !important;
-            font-size: 0.8rem !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
         div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
             color: #f8fafc !important;
-            font-weight: 700 !important;
+            font-weight: 800 !important;
+            font-size: 1.45rem !important;
         }
+
+        /* Primary & Secondary Buttons */
         .stButton > button[kind="primary"] {
-            border-radius: 10px;
-            font-weight: 600;
-            padding: 0.55rem 1.1rem;
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 11px !important;
+            font-weight: 700 !important;
+            padding: 0.6rem 1.25rem !important;
+            box-shadow: 0 8px 22px rgba(14, 165, 233, 0.32) !important;
+            transition: transform 0.15s ease, box-shadow 0.15s ease !important;
         }
-        .stDownloadButton > button {
-            border-radius: 10px;
-            font-weight: 600;
+        .stButton > button[kind="primary"]:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 26px rgba(14, 165, 233, 0.45) !important;
+        }
+        .stDownloadButton > button, .stButton > button[kind="secondary"] {
+            background: rgba(30, 41, 59, 0.78) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(56, 189, 248, 0.28) !important;
+            border-radius: 11px !important;
+            font-weight: 600 !important;
+        }
+        .stDownloadButton > button:hover {
+            border-color: #38bdf8 !important;
+            background: rgba(30, 41, 59, 0.98) !important;
+        }
+
+        /* Expanders, Alerts & Inputs */
+        div[data-testid="stExpander"] {
+            background: rgba(15, 23, 42, 0.65) !important;
+            border: 1px solid rgba(148, 163, 184, 0.2) !important;
+            border-radius: 12px !important;
+        }
+        div[data-testid="stAlert"] {
+            border-radius: 12px !important;
         }
         div[data-testid="stDataFrame"] {
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 14px !important;
+            overflow: hidden !important;
+            border: 1px solid rgba(56, 189, 248, 0.22) !important;
+        }
+        .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
+            background-color: rgba(15, 23, 42, 0.85) !important;
+            border: 1px solid rgba(148, 163, 184, 0.25) !important;
+            border-radius: 10px !important;
+            color: #f8fafc !important;
         }
     </style>
+
     <div class="hero-box">
-        <div class="hero-badge">VERILOGIX AI • RISK & COMPLIANCE ENGINE</div>
+        <div class="hero-badge">VERILOGIX AI • ENTERPRISE RISK ENGINE</div>
         <div class="hero-title">⚖️ Contract &amp; RFP Risk Intelligence</div>
         <p class="hero-sub">
-            Spot high-risk clauses, deal-breakers, and financial exposure in seconds — with redline comparison, negotiation drafts, and instant exportable reports.
+            Detect hidden liability traps, deal-breakers, and financial exposure in seconds — complete with redline comparisons, counter-proposals, and board-ready reports.
         </p>
+        <div class="hero-pills">
+            <span class="hero-pill">⚡ Instant Risk Scoring</span>
+            <span class="hero-pill">🛑 Deal-Breaker Alerts</span>
+            <span class="hero-pill">🔄 Redline Diff &amp; Timeline</span>
+            <span class="hero-pill">🔒 Local PII Privacy</span>
+        </div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -191,7 +324,6 @@ if "audit_reports" not in st.session_state:
 if "pdf_bytes_store" not in st.session_state:
     st.session_state.pdf_bytes_store = {}
 if "doc_meta_store" not in st.session_state:
-    # Stores {filename: {"extracted_text": str, "page_count": int, "is_scanned": bool}}
     st.session_state.doc_meta_store = {}
 if "comparison_report" not in st.session_state:
     st.session_state.comparison_report = None
@@ -364,7 +496,6 @@ with tab1:
                     for m in report.rfp_compliance_matrix
                 ]
                 st.dataframe(pd.DataFrame(matrix_data), width="stretch")
-
             if report.missing_protections:
                 with st.expander("🛡️ Missing Protective Clauses", expanded=False):
                     for item in report.missing_protections:
@@ -478,6 +609,89 @@ with tab2:
                 if not api_key:
                     st.error("Please enter your API key in the sidebar first.")
                 else:
+                    with st.spinner(
+                        "Comparing both versions and analyzing legal and financial differences..."
+                    ):
+                        try:
+                            orig_meta = extract_document_data(orig_file.getvalue())
+                            rev_meta = extract_document_data(rev_file.getvalue())
+                            if not orig_meta["is_scanned"] and not rev_meta["is_scanned"]:
+                                st.session_state.quick_diff_preview = compute_quick_redline_diff(
+                                    orig_meta["extracted_text"], rev_meta["extracted_text"]
+                                )
+                            comp_report = compare_contracts(
+                                original_bytes=orig_file.getvalue(),
+                                revised_bytes=rev_file.getvalue(),
+                                api_key=api_key,
+                                jurisdiction=jurisdiction,
+                                output_language=output_language,
+                                pre_orig_text=orig_meta["extracted_text"],
+                                pre_rev_text=rev_meta["extracted_text"],
+                                use_quick_diff=use_quick_diff,
+                            )
+                            st.session_state.comparison_report = comp_report
+                        except Exception as e:
+                            st.error(f"Comparison failed: {str(e)}")
+
+        if st.session_state.comparison_report:
+            comp = st.session_state.comparison_report
+            st.markdown("---")
+            m1, m2 = st.columns(2)
+            m1.metric("Safety Improvement Score", f"{comp.overall_improvement_score} / 100")
+            m2.metric("Final Legal Verdict", comp.final_recommendation)
+
+            st.info(comp.executive_comparison_summary)
+
+            st.subheader("📝 Detailed Redline Changes Breakdown")
+            changes_data = [
+                {
+                    "Clause Topic": ch.clause_topic,
+                    "Status": ch.change_status,
+                    "Original Version": ch.original_text_summary,
+                    "Revised Version": ch.revised_text_summary,
+                    "Risk Impact": ch.risk_impact,
+                }
+                for ch in comp.changes_breakdown
+            ]
+            st.dataframe(pd.DataFrame(changes_data), width="stretch")
+
+    else:
+        st.markdown(
+            "Upload contract versions in chronological order of negotiation rounds (from oldest to newest) to track risk progression and open clauses."
+        )
+        timeline_files = st.file_uploader(
+            "Upload Contract Versions in Chronological Order (V1, V2, V3...)",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="timeline_pdfs",
+        )
+
+        if timeline_files:
+            sig = hashlib.md5(
+                "|".join(f"{f.name}:{f.size}" for f in timeline_files).encode()
+            ).hexdigest()
+            if sig != st.session_state.last_timeline_sig:
+                st.session_state.timeline_report = None
+                st.session_state.last_timeline_sig = sig
+
+            file_names = [f.name for f in timeline_files]
+            ordered_names = st.multiselect(
+                "Verify or Adjust Chronological Round Order (First = Round 1):",
+                options=file_names,
+                default=file_names,
+            )
+            file_map = {f.name: f for f in timeline_files}
+            ordered_files = [file_map[n] for n in ordered_names if n in file_map]
+
+            for i, f in enumerate(ordered_files, start=1):
+                st.write(f"**Round {i}:** `{f.name}`")
+
+            if len(ordered_files) >= 2 and st.button(
+                "📈 Build Negotiation Timeline", type="primary"
+            ):
+                if not api_key:
+                    st.error("Please enter your API key in the sidebar first.")
+                else:
                     with st.spinner("Analyzing negotiation path across all versions..."):
                         try:
                             versions_payload = [(f.name, f.getvalue()) for f in ordered_files]
@@ -530,3 +744,5 @@ with tab2:
                 st.subheader("🎯 Leverage Tips for Next Negotiation Round")
                 for tip in tl.next_round_leverage_tips:
                     st.warning(f"• {tip}")
+
+    
