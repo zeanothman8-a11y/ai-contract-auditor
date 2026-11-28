@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verilogix AI — Contract & RFP Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #050811;
+      --bg-1: #0b1120;
+      --card: rgba(15, 23, 42, 0.82);
+      --card-border: rgba(56, 189, 248, 0.22);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #2563eb;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --ok: #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(37, 99, 235, 0.22), transparent 38%),
+        radial-gradient(circle at 88% 18%, rgba(56, 189, 248, 0.16), transparent 40%),
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px 16px 60px;
+    }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      backdrop-filter: blur(14px);
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 14px var(--accent);
+    }
+
+    .status-pill {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.14);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.72), rgba(2, 132, 199, 0.22));
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 22px;
+      padding: 26px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 4px 11px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.5rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #ffffff 0%, #bae6fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      color: #cbd5e1;
+      font-size: 0.98rem;
+      line-height: 1.6;
+      max-width: 760px;
+      margin-bottom: 18px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 18px;
+      backdrop-filter: blur(12px);
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 11px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: rgba(2, 6, 23, 0.75);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.88rem;
+      margin-bottom: 12px;
+    }
+
+    .dropzone {
+      border: 1.5px dashed rgba(56, 189, 248, 0.45);
+      border-radius: 14px;
+      padding: 20px 14px;
+      text-align: center;
+      background: rgba(2, 6, 23, 0.45);
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    .dropzone:hover {
+      border-color: var(--accent);
+      background: rgba(14, 165, 233, 0.08);
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    button:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+      flex: 1;
+    }
+
+    .btn-ghost {
+      background: rgba(30, 41, 59, 0.85);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 15px;
+      padding: 14px;
+    }
+
+    .metric .k {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric .v {
+      font-size: 1.45rem;
+      font-weight: 800;
+    }
+
+    .danger-text { color: #f87171; }
+    .warn-text { color: #fbbf24; }
+    .ok-text { color: #34d399; }
+
+    .alert-banner {
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fecaca;
+      padding: 12px 15px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .risk-item {
+      background: rgba(2, 6, 23, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-left: 4px solid var(--danger);
+      border-radius: 13px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .risk-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .risk-item p {
+      font-size: 0.84rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .fix-box {
+      font-size: 0.8rem;
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      padding: 8px 10px;
+      border-radius: 9px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>VERILOGIX AI</span>
+      </div>
+      <div class="status-pill" id="connStatus">● Live Executive Preview Mode</div>
+    </div>
+
+    <div class="hero">
+      <div class="badge">AUTONOMOUS CONTRACT &amp; RFP INTELLIGENCE</div>
+      <h1>Catch High-Risk Clauses Before You Sign.</h1>
+      <p>
+        Instant clause extraction, non-negotiable deal-breaker alerts, financial exposure estimates, and redline counter-proposals — engineered for high-stakes commercial agreements.
+      </p>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">
+          <span>📄 Upload Agreement (PDF)</span>
+          <span style="color: var(--muted); font-size: 0.76rem;" id="fileLabel">No file selected</span>
+        </div>
+        <div class="dropzone" onclick="document.getElementById('pdfInput').click()">
+          <div style="font-size: 1.2rem; margin-bottom: 4px;">⬆️ Drop PDF or Click to Select</div>
+          <div style="color: var(--muted); font-size: 0.78rem;">Supports contracts, MSAs, SLAs &amp; RFPs</div>
+          <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="onFileChange(event)" />
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="runAudit()">⚡ Run Risk Audit</button>
+          <button class="btn-ghost" onclick="loadSample()">Load Sample Risk Report</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">
+          <span>🔌 Backend &amp; Engine Connection</span>
+          <span style="color: var(--muted); font-size: 0.76rem;">Optional live API</span>
+        </div>
+        <label for="apiUrl">FastAPI Backend URL (Render / Hugging Face)</label>
+        <input type="text" id="apiUrl" placeholder="https://your-backend.onrender.com/audit" />
+        <label for="jurisdiction">Governing Law / Jurisdiction</label>
+        <select id="jurisdiction">
+          <option>General International Commercial Law</option>
+          <option>Common Law / UK / US</option>
+          <option>UAE Law</option>
+          <option>Saudi Arabian Law (KSA)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="alertBox" class="alert-banner">
+      🛑 DEAL-BREAKER TRIGGERED: 2 non-negotiable clauses detected (Unlimited Consequential Liability &amp; Asymmetric IP Assignment).
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="k">Risk Score</div>
+        <div class="v danger-text" id="mScore">84 / 100</div>
+      </div>
+      <div class="metric">
+        <div class="k">Deal-Breakers</div>
+        <div class="v danger-text" id="mBreakers">2</div>
+      </div>
+      <div class="metric">
+        <div class="k">Est. Exposure</div>
+        <div class="v warn-text" id="mExposure">$240,000</div>
+      </div>
+      <div class="metric">
+        <div class="k">Redline Ready</div>
+        <div class="v ok-text" id="mStatus">4 Clauses</div>
+      </div>
+    </div>
+
+    <div class="panel" id="findingsPanel">
+      <div class="panel-title">
+        <span>🚨 Priority Clause Findings &amp; Redline Fixes</span>
+        <span style="color: var(--muted); font-size: 0.76rem;" id="statusMsg">Sample executive output</span>
+      </div>
+      <div id="findingsList">
+        <div class="risk-item">
+          <div class="risk-top">
+            <span>Section 9.2 — Unlimited Liability &amp; Indemnity</span>
+            <span class="tag">DEAL-BREAKER • HIGH</span>
+          </div>
+          <p>Exposes your company to uncapped indirect damages and third-party claims exceeding total contract value.</p>
+          <div class="fix-box"><strong>Suggested Redline:</strong> Cap aggregate liability at 1x fees paid in the preceding 12 months; exclude indirect/consequential damages.</div>
+        </div>
+        <div class="risk-item" style="border-left-color: var(--warn);">
+          <div class="risk-top">
+            <span>Section 12.1 — Unilateral IP Assignment</span>
+            <span class="tag" style="background: rgba(245,158,11,0.18); color:#fcd34d; border-color:rgba(245,158,11,0.4);">HIGH RISK</span>
+          </div>
+          <p>Transfers pre-existing tooling and reusable automation frameworks to the counterparty upon delivery.</p>
+          <div class="fix-box"><strong>Suggested Redline:</strong> Retain full ownership of pre-existing background IP and grant a non-exclusive license to deliverables only.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedFile = null;
+
+    function onFileChange(e) {
+      selectedFile = e.target.files[0] || null;
+      document.getElementById("fileLabel").textContent = selectedFile ? selectedFile.name : "No file selected";
+    }
+
+    function loadSample() {
+      document.getElementById("alertBox").style.display = "block";
+      document.getElementById("mScore").textContent = "84 / 100";
+      document.getElementById("mBreakers").textContent = "2";
+      document.getElementById("mExposure").textContent = "$240,000";
+      document.getElementById("mStatus").textContent = "4 Clauses";
+      document.getElementById("statusMsg").textContent = "Loaded sample executive preview";
+    }
+
+    async function runAudit() {
+      const apiUrl = document.getElementById("apiUrl").value.trim();
+      const statusMsg = document.getElementById("statusMsg");
+      const connStatus = document.getElementById("connStatus");
+
+      if (!apiUrl) {
+        statusMsg.textContent = "No backend URL entered yet — showing instant interactive preview.";
+        connStatus.textContent = "● Preview Ready (Add Backend URL for Live API)";
+        return;
+      }
+
+      if (!selectedFile) {
+        statusMsg.textContent = "Please select a PDF contract first.";
+        return;
+      }
+
+      statusMsg.textContent = "Sending contract to backend engine...";
+      connStatus.textContent = "● Connecting to Backend...";
+
+      try {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("jurisdiction", document.getElementById("jurisdiction").value);
+
+        const res = await fetch(apiUrl, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        document.getElementById("mScore").textContent = (data.overall_risk_score ?? 0) + " / 100";
+        document.getElementById("mBreakers").textContent = data.deal_breakers_triggered ?? 0;
+        document.getElementById("mExposure").textContent = data.estimated_financial_exposure || "N/A";
+        document.getElementById("mStatus").textContent = ((data.detected_risks || []).length) + " Clauses";
+
+        const listEl = document.getElementById("findingsList");
+        listEl.innerHTML = "";
+        (data.detected_risks || []).forEach(r => {
+          const div = document.createElement("div");
+          div.className = "risk-item";
+          div.innerHTML = `
+            <div class="risk-top">
+              <span>${r.clause_title || "Risk Clause"} (Page ${r.page_number || "-"})</span>
+              <span class="tag">${r.risk_level || "RISK"}</span>
+            </div>
+            <p>${r.explanation || ""}</p>
+            <div class="fix-box"><strong>Suggested Redline:</strong> ${r.alternative_wording || r.recommended_action || ""}</div>
+          `;
+          listEl.appendChild(div);
+        });
+
+        statusMsg.textContent = "Live audit completed from backend.";
+        connStatus.textContent = "● Connected to Live Backend";
+      } catch (err) {
+        statusMsg.textContent = "Backend connection error: " + err.message;
+        connStatus.textContent = "● Backend Offline / Check URL";
+      }
+    }
+  </script>
+</body>
+  </html>
+  
