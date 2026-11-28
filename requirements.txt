@@ -5,3 +5,6 @@ pydantic
 pandas
 PyMuPDF
 python-docx
+fastapi
+uvicorn
+python-multipart
