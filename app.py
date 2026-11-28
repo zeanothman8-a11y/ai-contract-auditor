@@ -32,6 +32,16 @@ st.markdown(
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
 
+        /* Hide Streamlit top toolbar, decoration & menu when possible */
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"],
+        #MainMenu {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+
         /* Full app background override */
         [data-testid="stAppViewContainer"] {
             background: radial-gradient(circle at 15% 10%, #132238 0%, #090e1a 48%, #060911 100%) !important;
@@ -39,8 +49,8 @@ st.markdown(
         }
 
         [data-testid="stHeader"] {
-            background: rgba(9, 14, 26, 0.72) !important;
-            backdrop-filter: blur(10px);
+            background: transparent !important;
+            height: 2.2rem !important;
         }
 
         [data-testid="stSidebar"] {
@@ -49,7 +59,7 @@ st.markdown(
         }
 
         .block-container {
-            padding-top: 1.4rem !important;
+            padding-top: 2.6rem !important;
             padding-bottom: 3rem !important;
             max-width: 1280px !important;
         }
@@ -324,6 +334,7 @@ if "audit_reports" not in st.session_state:
 if "pdf_bytes_store" not in st.session_state:
     st.session_state.pdf_bytes_store = {}
 if "doc_meta_store" not in st.session_state:
+    # Stores {filename: {"extracted_text": str, "page_count": int, "is_scanned": bool}}
     st.session_state.doc_meta_store = {}
 if "comparison_report" not in st.session_state:
     st.session_state.comparison_report = None
@@ -496,6 +507,7 @@ with tab1:
                     for m in report.rfp_compliance_matrix
                 ]
                 st.dataframe(pd.DataFrame(matrix_data), width="stretch")
+
             if report.missing_protections:
                 with st.expander("🛡️ Missing Protective Clauses", expanded=False):
                     for item in report.missing_protections:
@@ -744,5 +756,3 @@ with tab2:
                 st.subheader("🎯 Leverage Tips for Next Negotiation Round")
                 for tip in tl.next_round_leverage_tips:
                     st.warning(f"• {tip}")
-
-    
